@@ -4,7 +4,7 @@ lvmtipo
 
 |py| |pypi| |Build Status| |docs| |Coverage Status|
 
-``lvmtipo`` common Telescope and Instrument Parameters & Obejcts for lvm
+``lvmtipo`` common Telescope/Instrument Parameters & Objects for lvm
 
 Features
 --------
@@ -28,7 +28,7 @@ or from source
     pip install .
 
 
-Next, head to the `Getting started <https://github.com/sdss/lvmtipo/wiki>`__ section for more information about using clu+.
+Next, head to the `Getting started <https://github.com/sdss/lvmtipo/wiki>`__ section for more information about using lvmtipo
 
 
 .. |Build Status| image:: https://img.shields.io/github/workflow/status/sdss/lvmtipo/Test
