@@ -1,23 +1,19 @@
 
-CLU+
+lvmtipo
 ==========================================
 
 |py| |pypi| |Build Status| |docs| |Coverage Status|
 
-``CLU+`` adds some enhancements to sdss-clu
+``lvmtipo`` common telescope & instrument parameters for lvm
 
 Features
 --------
-- RPC/Corba/Zeroc Ice style actor communications
-- Asyncio & classic python usage
-- Complex data transfer with json
-- Alternative data handling with json-pickle, eg: numpy
-- Recursive config file loading
+- TODO
 
-Installation
+Installation (soon)
 ------------
 
-``CLU+`` can be installed using ``pip`` as
+``lvmtipo`` can be installed using ``pip`` as
 
 .. code-block:: console
 
