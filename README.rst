@@ -28,7 +28,7 @@ or from source
     pip install .
 
 
-Next, head to the `Getting started <https://github.com/sdss/lvmtipo/wiki>`__ section for more information about using clu+.
+Next, head to the `Getting started <https://github.com/sdss/lvmtipo/wiki>`__ section for more information about using lvmtipo
 
 
 .. |Build Status| image:: https://img.shields.io/github/workflow/status/sdss/lvmtipo/Test
