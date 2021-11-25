@@ -4,7 +4,7 @@ lvmtipo
 
 |py| |pypi| |Build Status| |docs| |Coverage Status|
 
-``lvmtipo`` common Telescope and Instrument Parameters & Obejcts for lvm
+``lvmtipo`` common Telescope/Instrument Parameters & Objects for lvm
 
 Features
 --------
