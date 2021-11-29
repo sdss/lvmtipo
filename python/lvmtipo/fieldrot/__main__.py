@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-"""
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
@@ -8,6 +7,7 @@
 # @Filename: homtrans.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
+"""
 Python3 class for siderostat field angles using homogeneous coordinates
 """
 
