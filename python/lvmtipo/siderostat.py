@@ -86,7 +86,7 @@ class Siderostat():
 
         # copute mirror positions 
         horiz = target.toHoriz(site=site, ambi=ambi, time = now) 
-        print(horiz)
+        # print(horiz)
 
         star = numpy.zeros((3))
         # same procedure as in the construction of b in the Siderostat ctor, but with 90-zenang=alt
@@ -220,19 +220,122 @@ class Siderostat():
 
         return targCtr
 
-    def mpiaMocon(self, site, target, ambi, wlen=0.5, time=None) :
+    def mpiaMocon(self, site, target, ambi, degNCP=0.0, deltaTime =45.0, polyN=20, 
+                  wlen=0.5, time=None, stepsPerturn = 6480000) :
         """ 
+        Compute the polynomial coefficients to rotate the K-mirror for
+        a total of polyN*deltaTime seconds in the future with the MPIA
+        MoCon, starting at 'time'. The result is a 2dim array in the
+        format [[index0,time0,vel0,pol0,acce0,jer0],[index1,time1,vel1,],[],...]
+
         :param site location of the observatory
         :type site fieldrotation.Site
+
         :param target sidereal target in ra/dec
         :type target astropy.coordinates
+
         :param ambi Ambient data relevant for refractive index
         :type ambi
+
+        :param degNCP The angle in degrees where the NCP (direction of +delta)
+              in the field should be fixed in the focal plane, basically 
+              a fiber selector. 
+              A value of zero means the +delta is up in the laboratory,
+              the value +90 means the +delta direction is right (horizontally E)
+              ..todo not yet implemented, so this is a dummy argument currently
+                and needs to be calculated accounting for the image flip of the K-mirr
+        :type float
+
+        :param deltaTime Time covered by a single polynomial in seconds
+          The default is 45 seconds, which is small enough to keep
+          the target aligned with the 0.23 mrad requirement  using only
+          first order polynomials.
+        :type float
+
+        :param polyN Number of polynomials to be constructed.
+          The default is 20. Note that the product of polyN and deltaTime
+          should at least be as long as the exposure time. So defaults of 20
+          and defaults of 45 seconds cover the 15 minutes of what is supposed
+          to be some standard of the LVM (South). Note that the trajectory
+          will stop after that total time; the motor may alsobe forced to
+          stop earlier (which is not in the scope of this documentation or software.)
+        :type int
+
         :param wlen wavelenght of observation in microns
         :type wlen float
+
         :param time time of the observation /UTC; if None, the current time will be used.
         :type time
-        :return field angle (direction to NCP) in radians
-        """
-        pass
 
+        :param stepsPerturn The number of steps to move the K-mirror
+              by 360 degrees. According to information of Lars Mohr of 2021-11-25 we
+              have 100 steps per degree, 18000 microsteps per degree.
+        :type int
+
+        :return The array of the integer values for the MPIA motor controller
+              external profile. This is the parameter set for the
+              SetExternalProfileData command (221).
+        Notes:
+          The program does not check that the targets are reachable, which
+          means whether they are in a zenith angle < 60 deg or above the horizon.
+        """
+        moc = []
+        if polyN > 0:
+            if isinstance(time, astropy.time.Time) :
+                now = time 
+            elif isinstance(time, str):
+                now = astropy.time.Time(time, format='isot', scale='utc')
+            elif time is None:
+                now = astropy.time.Time.now()
+
+            tdiff = astropy.time.TimeDelta(deltaTime*astropy.units.second)
+
+            # collect array of bare field angles in radians
+            rads = []
+            # number of steps to switch branch of the arctan (avoid +-180 deg warps)
+            degsteps =0 
+            for poly in range(polyN+1):
+                # print(now)
+                ang = self.fieldAngle(site, target, ambi, wlen=wlen, time=now)
+                ang += degsteps*2.0*math.pi
+
+                if poly > 0 :
+                    if ang > rads[poly-1] + math.pi :
+                        degsteps -= 1
+                        ang -= 2.0*math.pi 
+                    elif ang < rads[poly-1] - math.pi :
+                        degsteps += 1
+                        ang += 2.0*math.pi 
+
+                rads.append(ang)
+                # advance clock to the start of next polynomial
+                now += tdiff
+
+            # Use an arbitrary jump of 180 deg (that's optically 360 deg)
+            # to keep trajectory near the angle of 0 (stay away from
+            # the stops/limit switches at +-137 deg)
+            if rads[0] < -0.5*math.pi:
+                rads = [r + math.pi for r in rads]
+            elif rads[0] > 0.5*math.pi:
+                rads = [r - math.pi for r in rads]
+
+            # convert all angles from radians to counts
+            rads = [r *stepsPerturn/(2.0*math.pi) for r in rads]
+
+            # 1 cycle = 614.4 microsecs, see section 9.3 of MoCon User's Guide
+            cycsteps = deltaTime/614.4e-6
+            for poly in range(polyN):
+                # Apply factors -1/2 (sign to derotate, 1/2 for opt-mech-transf)
+                # Scale velocity and acceleration with 2^16=65536, yerk with 2^32.
+                # We do not use acceleration and yerk (almost 0 for LVMT)
+                pos = round(-0.5*rads[poly])
+
+                # rads[poly+1]-rads[poly]  is velocity in units of counts
+                # per deltaTime. Divide by deltaTime to get counts per second
+                # and multiply by 614.4e-6 to get counts per cycle.
+                vel = round(-0.5*65536*(rads[poly+1]-rads[poly])/cycsteps)
+                # Note the perturbed order: velocity is before position....
+                traj = [poly, round(cycsteps), vel, pos, 0,0]
+                moc.append(traj)
+ 
+        return moc

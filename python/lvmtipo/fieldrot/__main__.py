@@ -45,6 +45,9 @@ def main():
     # optional name of a fiber
     parser.add_argument("-f", '--fiber', help="fiber name like P2-1 or P1-11")
 
+    # optional number of mocon polynomials
+    parser.add_argument("-N", '--polyN', help="number of mocon polynomials")
+
     args = parser.parse_args()
 
     # check ranges and combine ra/dec into a astropy SkyCoord
@@ -81,6 +84,8 @@ def main():
         ctrTarg = sid.centrTarg(geoloc, point, None, fib)
         print(ctrTarg.targ)
 
-if __name__ == "__main__":
-    main()
-
+    # If the command line option -N was used, construct
+    # the mocon external profile data as list:
+    if args.polyN is not None :
+        moc=sid.mpiaMocon(geoloc, point, None, polyN= int(args.polyN))
+        print(moc)
