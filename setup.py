@@ -40,7 +40,7 @@ setup(
     classifiers=module_tool_poetry["classifiers"],
     package_dir={"": module_package_from},
     packages=[module_tool_poetry["packages"][0]["include"]],
-    include_package_data=True,
+    include_package_data=False,
     package_data={"": module_package_include},
     keywords=", ".join(module_tool_poetry["keywords"]),
     python_requires=">=3.7, <4",
