@@ -26,6 +26,9 @@ from lvmtipo.target import Target
 
 def main():
     """ Example application demonstrating the interface.
+    Examples:
+    ./HomoTrans.py -r 230 -d -80 -f P2-2
+    ./HomoTrans.py -r 230 -d -80 -N 10
     .. todo demonstrate use of proper motions 
     """
     import argparse
@@ -45,6 +48,9 @@ def main():
     # optional name of a fiber
     parser.add_argument("-f", '--fiber', help="fiber name like P2-1 or P1-11")
 
+    # optional
+    parser.add_argument("-T", '--deltaTime', type=int, default=45, help="time covered by a single polynomial in seconds")
+
     # optional number of mocon polynomials
     parser.add_argument("-N", '--polyN', help="number of mocon polynomials")
 
@@ -60,11 +66,12 @@ def main():
     else :
         targ = None
 
-    # step 1: define where the observatory is (on Earth)
+    # step 1: define where the observatory is on Earth
     geoloc = Site(name = args.site)
     # print(geoloc)
 
     # step 2: define where the output beam of the siderostat points to
+    # and use the LCO defaults.
     sid = Siderostat()
     # print(sid)
 
@@ -77,15 +84,17 @@ def main():
     print("field angle " + str(math.degrees(rads)) + " deg")
 
     # if a P[12]-[1..12] fiber head was specified, calculate
-    # also the virtual target in the fiber bundle center.
+    # also the virtual target in the fiber bundle center
+    # for "off-center" tracking, supposing the siderostat PWI
+    # needs to be fed with the target coordinates of the center.
     if args.fiber is not None and targ is not None :
-        fib=Fiber(args.fiber)
+        fib=Fiber.Fiber(args.fiber)
         # print("lab angle " + str(math.degrees(fib.labAngle())) + " deg")
         ctrTarg = sid.centrTarg(geoloc, point, None, fib)
         print(ctrTarg.targ)
 
     # If the command line option -N was used, construct
-    # the mocon external profile data as list:
+    # the mocon external profile data as a list of lists:
     if args.polyN is not None :
-        moc=sid.mpiaMocon(geoloc, point, None, polyN= int(args.polyN))
+        moc=sid.mpiaMocon(geoloc, point, None, deltaTime=args.deltaTime, polyN= int(args.polyN))
         print(moc)

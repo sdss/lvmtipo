@@ -24,7 +24,7 @@ __all__ = ['Ambient']
 class Ambient():
     """ ambient parameters relevant to atmospheric refraction
     :param press pressure in hPa. Can be None if the site parameter
-                 is not-None so we can get an estimate from sea level altitude.
+                 is not-None so we can get a pressure estimate from sea level altitude.
     :type press float
     :param temp Temperature in deg Celsius.
     :type temp float
@@ -52,3 +52,4 @@ class Ambient():
                 self.press = 1013.0
         else:
             self.press = press
+

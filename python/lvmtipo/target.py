@@ -40,7 +40,7 @@ class Target():
         """ convert from equatorial to horizontal coordinates
         :param site Observatory location
         :type site fieldrotation.Site
-        :param ambi Ambient parameters characterizing refraction
+        :param ambi Ambient parameters used for refraction correction
         :type ambi fieldrotation.Ambient
         :param time time of the observation
         :type time astropy.time.Time
@@ -68,7 +68,7 @@ class Target():
         # print(earthloc)
         # print(astropy.units.Quantity(100.*refr.press,unit=astropy.units.Pa))
         # print(astropy.units.Quantity(refr.wlen,unit= astropy.units.um))
-        # todo: render also promer motions (all 3 coords)
+        # todo: render also proper motions (all 3 coords)
         # This is a blank form of Alt/aZ because the two angles are yet unknown
         # altaz = astropy.coordinates.builtin_frames.AltAz
         altaz = astropy.coordinates.AltAz(
@@ -82,3 +82,4 @@ class Target():
         horiz = self.targ.transform_to(altaz)
         return horiz
 
+      

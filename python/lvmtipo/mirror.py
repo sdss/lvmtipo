@@ -22,11 +22,25 @@ __all__ = ['Mirror']
 
 
 class Mirror():
-    """ A flat mirror
+    """ A flat mirror.
+    This represents an infintely large flat plane. The internal
+    representation is the surface normal and the standard 
+    equation that the dot product of points on the surface by
+    the surface normal equals the distance (of the plane to the
+    origina of coordinates).
     """
 
     def __init__(self, normal, disttoorg):
-
+        """ 
+        :param normal The 3 Cartesian coordinates of the surface normal.
+               It must have nonzero length, but
+               does not need to be normalized to unit length.
+        :type numpy.ndarray with 3 (xyz) numbers
+        :param disttoorg The distance of the mirror to the origin of coordinates
+               As in usual geometry, the distance is the shortest distance of the origin
+               to the infinitely extended mirror plane.
+        :type float
+        """
         if isinstance(normal, numpy.ndarray) and isinstance(disttoorg, (int,float)) :
             self.d = float(disttoorg)
             if normal.ndim == 1 and normal.shape[0] == 3:
@@ -39,6 +53,10 @@ class Mirror():
             raise TypeError("invalid data types")
 
     def toHomTrans(self) :
+        """ 
+        :return The homogeneous transformation that represents
+              the reflection of rays off this mirror surface.
+        """ 
         matr = numpy.zeros((4,4))
         for r in range(4):
             for c in range(4):

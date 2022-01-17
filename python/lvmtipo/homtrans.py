@@ -21,7 +21,9 @@ __all__ = ['HomTrans']
 
 
 class HomTrans():
-    """ A single coordinate transformation.
+    """ A single affine coordinate transformation.
+    Represented internally by a 4x4 matrix as a projective
+    "homogeneous" transformation.
     """
 
     def __init__(self, entries):
@@ -34,6 +36,12 @@ class HomTrans():
 
     def multiply(self, rhs):
         """ 
+        :param rhs The transformation to the right of the multiplication
+                   sign. So rhs is applied before this transformation.
+        :type HomTrans
+        :return The homogeneous transformation which is the (non-communtative)
+                product of self with rhs, representing the consecutive
+                application of rhs, then self.
         """
         if isinstance(rhs, HomTrans) :
             prod = numpy.matmul(self.matr,rhs.matr)
@@ -46,6 +54,11 @@ class HomTrans():
 
     def apply(self, rhs):
         """ 
+        Apply self transformation to a vector of coordinates.
+        :param rhs The vector. If it has only the standard 3 coordinates,
+                   a virtual 1 is appended before applying the transformation. 
+        :type numpy.ndarray of dimension 1
+        :return a numpy.ndarray with a vector of 3 (standard, projected) Cartesian coordinates.
         """
         if isinstance(rhs, numpy.ndarray) :
             if rhs.ndim == 1 :

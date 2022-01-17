@@ -27,12 +27,17 @@ class Site():
     def __init__(self, long= -70.70056, lat= -29.01091, alt=2280, name=None) :
         """ Geolocation of observatory
         :param long geodetic longitude in degrees, E=positive
+               Default is the LCO parameter.
         :type long float
         :param lat geodetic latitude in degrees, N=positive
+               Default is the LCO parameter.
         :type lat float
         :param alt altitude above sea level
+               Default is the LCO parameter.
         :type alt float
-        :param name one of the LVM site acronyms, {LCO|APO|MPIA|KHU}
+        :param name of one of the 4 LVM site acronyms, {LCO|APO|MPIA|KHU}
+               If this parameter is present, it overrides the values
+               of the other 3 numerical parameters.
         :type name string
         """
 
@@ -64,4 +69,3 @@ class Site():
 
     def toEarthLocation(self) :
         return astropy.coordinates.EarthLocation.from_geodetic(self.long, self.lat, height=self.alt)
-
