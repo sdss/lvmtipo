@@ -10,7 +10,7 @@ Features
 --------
 - TODO
 
-Installation (soon)
+Installation
 ------------
 
 ``lvmtipo`` can be installed using ``pip`` as
