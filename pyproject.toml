@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sdss-lvmtipo"
-version = "0.0.4"
+version = "0.0.5"
 description = "Additional functionality for sdss-clu"
 authors = ["Florian Briegel <briegel@mpia.de>"]
 license = "BSD-3-Clause"
