@@ -359,12 +359,12 @@ class Siderostat():
                 # and multiply by 614.4e-6 to get counts per cycle.
                 vel = round(65536*(rads[poly+1]-rads[poly])/cycsteps)
                 # Note the order: index, duration, velocity is before position....
-                traj = [poly, round(cycsteps), vel, pos, 0,0]
+                traj = [round(cycsteps), vel, pos, 0,0]
                 moc.append(traj)
 
             # last entry with time 0 to stop the motor
             # (otherwise it would cycle and restart/rewind at entry 0)
-            moc.append([polyN,0,0,round(rads[-1]),0,0])
+            moc.append([0,0,round(rads[-1]),0,0])
  
         return moc
 
