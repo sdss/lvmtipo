@@ -79,7 +79,17 @@ class Target():
                  relative_humidity = refr.rhum,
                  obswl = astropy.units.Quantity(refr.wlen,unit= astropy.units.um))
 
-        horiz = self.targ.transform_to(altaz)
+        try:
+            horiz = self.targ.transform_to(altaz)
+
+        except ValueError as ex:
+            # This is sometimes triggered by being offline or the
+            # IERS data server being unreachable.
+            # Try again with a sort of offline attempt of the IERS tables
+            from astropy.utils.iers import conf
+            conf.auto_download = False
+            horiz = self.targ.transform_to(altaz)
+
         return horiz
 
       

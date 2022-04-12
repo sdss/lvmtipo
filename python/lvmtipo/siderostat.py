@@ -72,7 +72,9 @@ class Siderostat():
         :type target astropy.coordinates
         :param ambi Ambient data relevant for refractive index
         :type ambi
-        :param wlen wavelenght of observation in microns
+        :param wlen wavelength of observation in microns.
+             Default is 500 nm, the canonical light in the visible and an
+             estimator of the mean band widht of the LVM.
         :type wlen float
         :param time time of the observation /UTC; if None, the current time will be used.
         :type time
