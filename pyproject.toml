@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sdss-lvmtipo"
-version = "0.0.9"
+version = "0.0.10"
 description = "Additional functionality for sdss-clu"
 authors = ["Florian Briegel <briegel@mpia.de>"]
 license = "BSD-3-Clause"
@@ -20,7 +20,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 packages = [
-    { include = "lvmtipo", from = "python" }
+    { include = "lvmtipo", from = "python" },
+    { include = "lvm", from = "python" }
 ]
 include = ["python/lvmtipo/etc/*"]
 
