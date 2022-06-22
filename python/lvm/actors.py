@@ -2,7 +2,7 @@
 #
 # @Author: Florian Briegel (briegel@mpia.de)
 # @Date: 2021-08-18
-# @Filename: lvm_actors.py
+# @Filename: lvm/actors.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
 from cluplus.proxy import Proxy
