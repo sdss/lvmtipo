@@ -5,7 +5,9 @@
 # @Filename: lvm/actors.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
-from cluplus.proxy import Proxy
+
+import asyncio
+from cluplus.proxy import Proxy, invoke, unpack, flatten, 
 
 
 class lvm:
@@ -17,7 +19,7 @@ class lvm:
         ag = Proxy( "lvm.sci.ag")
 
         async def start():
-            rc = await asyncio.gather(
+            await asyncio.gather(
                 lvm.sci.foc.start(),
                 lvm.sci.km.start(),
                 lvm.sci.pwi.start(),
@@ -36,7 +38,7 @@ class lvm:
         ag = Proxy( "lvm.skye.ag")
         
         async def start():
-            await invoke(
+            await asyncio.gather(
                 lvm.skye.foc.start(),
                 lvm.skye.km.start(),
                 lvm.skye.pwi.start(),
@@ -54,8 +56,7 @@ class lvm:
         agc = Proxy( "lvm.skyw.agcam")
         ag = Proxy( "lvm.skyw.ag")
         async def start():
-            await lvm_amqpc.start()
-            await invoke(
+            await asyncio.gather(
                 lvm.skyw.foc.start(),
                 lvm.skyw.km.start(),
                 lvm.skyw.pwi.start(),
@@ -73,8 +74,7 @@ class lvm:
         agc = Proxy( "lvm.spec.agcam")
         ag = Proxy( "lvm.spec.ag")
         async def start():
-            await lvm_amqpc.start()
-            await invoke(
+            await asyncio.gather(
                 lvm.spec.foc.start(),
                 lvm.spec.fibsel.start(),
                 lvm.spec.pwi.start(),
