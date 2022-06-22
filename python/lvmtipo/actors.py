@@ -7,7 +7,7 @@
 
 
 import asyncio
-from cluplus.proxy import Proxy, invoke, unpack, flatten, 
+from cluplus.proxy import Proxy, invoke, unpack, flatten
 
 
 class lvm:
