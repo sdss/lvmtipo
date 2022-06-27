@@ -83,9 +83,9 @@ def test_S():
     degs = math.degrees(fib.labAngle())
     assert degs == pytest.approx( 180.0)
 
-    fib = Fiber("S3-1")
-    degs = math.degrees(fib.labAngle())
-    assert degs == pytest.approx( -120.0)
+    #fib = Fiber("S3-1")
+    #degs = math.degrees(fib.labAngle())
+    #assert degs == pytest.approx( -120.0)
 
     fib = Fiber("S3-25")
     degs = math.degrees(fib.labAngle())
