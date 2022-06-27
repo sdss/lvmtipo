@@ -20,8 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 packages = [
-    { include = "lvmtipo", from = "python" },
-    { include = "lvm", from = "python" }
+    { include = "lvmtipo", from = "python" }
 ]
 include = ["python/lvmtipo/etc/*"]
 
