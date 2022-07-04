@@ -11,12 +11,18 @@ from cluplus.proxy import Proxy, invoke, unpack, flatten
 
 
 class lvm:
+    nps = Proxy("lvmnps")
+    ieb = Proxy("lvmieb")
+    ecp = Proxy("lvmecp")
+    scp = Proxy("lvmscp")
+    scraper = Proxy("lvmscraper")
+
     class sci:
-        foc = Proxy( "lvm.sci.foc")
-        km = Proxy( "lvm.sci.km")
-        pwi = Proxy( "lvm.sci.pwi")
-        agc = Proxy( "lvm.sci.agcam")
-        ag = Proxy( "lvm.sci.ag")
+        foc = Proxy("lvm.sci.foc")
+        km = Proxy("lvm.sci.km")
+        pwi = Proxy("lvm.sci.pwi")
+        agc = Proxy("lvm.sci.agcam")
+        ag = Proxy("lvm.sci.ag")
 
         async def start():
             await asyncio.gather(
@@ -29,13 +35,12 @@ class lvm:
             )
             return lvm.sci
 
-
     class skye:
-        foc = Proxy( "lvm.skye.foc")
-        km = Proxy( "lvm.skye.km")
-        pwi = Proxy( "lvm.skye.pwi")
-        agc = Proxy( "lvm.skye.agcam")
-        ag = Proxy( "lvm.skye.ag")
+        foc = Proxy("lvm.skye.foc")
+        km = Proxy("lvm.skye.km")
+        pwi = Proxy("lvm.skye.pwi")
+        agc = Proxy("lvm.skye.agcam")
+        ag = Proxy("lvm.skye.ag")
         
         async def start():
             await asyncio.gather(
@@ -48,13 +53,12 @@ class lvm:
             )
             return lvm.skye
 
-
     class skyw:
-        foc = Proxy( "lvm.skyw.foc")
-        km = Proxy( "lvm.skyw.km")
-        pwi = Proxy( "lvm.skyw.pwi")
-        agc = Proxy( "lvm.skyw.agcam")
-        ag = Proxy( "lvm.skyw.ag")
+        foc = Proxy("lvm.skyw.foc")
+        km = Proxy("lvm.skyw.km")
+        pwi = Proxy("lvm.skyw.pwi")
+        agc = Proxy("lvm.skyw.agcam")
+        ag = Proxy("lvm.skyw.ag")
         async def start():
             await asyncio.gather(
                 lvm.skyw.foc.start(),
@@ -66,13 +70,12 @@ class lvm:
             )
             return lvm.skyw
 
-
     class spec:
-        foc = Proxy( "lvm.spec.foc")
-        fibsel = Proxy( "lvm.spec.fibsel")
-        pwi = Proxy( "lvm.spec.pwi")
-        agc = Proxy( "lvm.spec.agcam")
-        ag = Proxy( "lvm.spec.ag")
+        foc = Proxy("lvm.spec.foc")
+        fibsel = Proxy("lvm.spec.fibsel")
+        pwi = Proxy("lvm.spec.pwi")
+        agc = Proxy("lvm.spec.agcam")
+        ag = Proxy("lvm.spec.ag")
         async def start():
             await asyncio.gather(
                 lvm.spec.foc.start(),
