@@ -15,7 +15,7 @@ class lvm:
     ieb = Proxy("lvmieb")
     ecp = Proxy("lvmecp")
     scp = Proxy("lvmscp")
-    scraper = Proxy("lvmscraper")
+    scraper = Proxy("lvm.scraper")
 
     class sci:
         foc = Proxy("lvm.sci.foc")
