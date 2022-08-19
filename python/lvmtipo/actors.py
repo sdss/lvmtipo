@@ -89,12 +89,12 @@ class lvm:
 
     def from_string(subsys: str):
         if subsys == 'sci': 
-            return lvm.sci.start()
+            return lvm.sci
         elif subsys == 'skye': 
-            return lvm.skye.start()
+            return lvm.skye
         elif subsys == 'skyw': 
-            return lvm.skyw.start()
+            return lvm.skyw
         elif subsys == 'spec': 
-            return lvm.spec.start()
+            return lvm.spec
         else: return None
 
