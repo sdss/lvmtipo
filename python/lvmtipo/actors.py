@@ -7,6 +7,8 @@
 
 
 import asyncio
+from typing import Union
+
 from cluplus.proxy import Proxy, invoke, unpack, flatten
 
 
@@ -97,4 +99,6 @@ class lvm:
         elif subsys == 'spec': 
             return lvm.spec
         else: return None
+
+    TelSubSystem = Union[sci, skye, skyw, spec]
 
