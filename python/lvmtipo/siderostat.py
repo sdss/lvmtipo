@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# @Author: Richard J. Mathar <mathar@mpia.de>
 # @Date: 2021-11.21
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
@@ -225,12 +224,12 @@ class Siderostat():
         return targCtr
 
     def mpiaMocon(self, site, target, ambi, degNCP=0.0, deltaTime =45.0, polyN=20, 
-                  wlen=0.5, time=None, stepsPerturn = 6480000) :
+                  wlen=0.5, time=None, homeIsWest = False, homeOffset = 135.0, stepsPerturn = 6480000) :
         """ 
         Compute the polynomial coefficients to rotate the K-mirror for
         a total of polyN*deltaTime seconds in the future with the MPIA
         MoCon, starting at 'time'. The result is a 2dim list of lists in the
-        format [[index0,time0,vel0,pol0,acce0,jer0],[index1,time1,vel1,],[],...]
+        format [[time0,vel0,pol0,acce0,jer0],[time1,vel1,],[],...]
 
         :param site location of the observatory
         :type site fieldrotation.Site
@@ -270,6 +269,22 @@ class Siderostat():
 
         :param time start time of the derotation /UTC; if None, the current time will be used.
         :type time
+
+        :param homeIsWest True if the western of the two limit switches of
+              the K-mirror is the home switch, false if the eastern limit
+              switch is the home switch.
+              Default is what's be in fact the cabling at MPIA in Feb 2022.
+        :type bool
+
+        :param homeOffset The angular difference between the K-mirror position
+              at home and if its M2 is up, measured in degrees. This value is always positive
+              and definitely must be calibrated before this function can be used.
+              Default is an estimate from the engineering design, where the
+              hall sensor (defining home) is slightly "inside" the mechanical switch.
+              The maximum usable range (mechanically) is roughly twice that value,
+              because the two limit switches are approximately symmetrical at
+              the west and east.
+        :type float
 
         :param stepsPerturn The number of steps to move the K-mirror
               by 360 degrees. According to information of Lars Mohr of 2021-11-25 we
@@ -349,6 +364,15 @@ class Siderostat():
             # convert all angles from radians to counts
             rads = [r *stepsPerturn/(2.0*math.pi) for r in rads]
 
+            homeOffsetSteps = homeOffset * stepsPerturn / 360.0
+            # convert all counts measured from 0=up to counts
+            # relative to the home/reference position of the MoCon
+            if homeIsWest :
+                rads = [r + homeOffsetSteps for r in rads]
+            else :
+                rads = [homeOffsetSteps - r for r in rads]
+
+
             # 1 cycle = 614.4 microsecs, see section 9.3 of MoCon User's Guide
             cycsteps = deltaTime/614.4e-6
             for poly in range(polyN):
@@ -360,7 +384,7 @@ class Siderostat():
                 # per deltaTime. Divide by deltaTime to get counts per second
                 # and multiply by 614.4e-6 to get counts per cycle.
                 vel = round(65536*(rads[poly+1]-rads[poly])/cycsteps)
-                # Note the order: index, duration, velocity is before position....
+                # Note the order: duration, velocity is before position....
                 traj = [round(cycsteps), vel, pos, 0,0]
                 moc.append(traj)
 
