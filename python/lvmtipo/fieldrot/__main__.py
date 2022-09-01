@@ -64,6 +64,7 @@ def main():
         else :
             targ = astropy.coordinates.SkyCoord(args.ra + " " + args.dec)
     else :
+        print("no sky coordinates provided")
         targ = None
 
     # step 1: define where the observatory is on Earth
@@ -75,26 +76,27 @@ def main():
     sid = Siderostat()
     # print(sid)
 
-    # step 3: define where the sidereostat is pointing on the sky
-    point = Target(targ)
-    print("target is ",targ)
-
-    # calculate the field angle (in radians)
-    rads = sid.fieldAngle(geoloc, point, None)
-    print("field angle " + str(math.degrees(rads)) + " deg")
-
-    # if a P[12]-[1..12] fiber head was specified, calculate
-    # also the virtual target in the fiber bundle center
-    # for "off-center" tracking, supposing the siderostat PWI
-    # needs to be fed with the target coordinates of the center.
-    if args.fiber is not None and targ is not None :
-        fib=Fiber.Fiber(args.fiber)
-        # print("lab angle " + str(math.degrees(fib.labAngle())) + " deg")
-        ctrTarg = sid.centrTarg(geoloc, point, None, fib)
-        print(ctrTarg.targ)
-
-    # If the command line option -N was used, construct
-    # the mocon external profile data as a list of lists:
-    if args.polyN is not None :
-        moc=sid.mpiaMocon(geoloc, point, None, deltaTime=args.deltaTime, polyN= int(args.polyN))
-        print(moc)
+    if targ is not None :
+        # step 3: define where the sidereostat is pointing on the sky
+        point = Target(targ)
+        print("target is ",targ)
+    
+        # calculate the field angle (in radians)
+        rads = sid.fieldAngle(geoloc, point, None)
+        print("field angle " + str(math.degrees(rads)) + " deg")
+    
+        # if a P[12]-[1..12] fiber head was specified, calculate
+        # also the virtual target in the fiber bundle center
+        # for "off-center" tracking, supposing the siderostat PWI
+        # needs to be fed with the target coordinates of the center.
+        if args.fiber is not None :
+            fib=Fiber.Fiber(args.fiber)
+            # print("lab angle " + str(math.degrees(fib.labAngle())) + " deg")
+            ctrTarg = sid.centrTarg(geoloc, point, None, fib)
+            print(ctrTarg.targ)
+    
+        # If the command line option -N was used, construct
+        # the mocon external profile data as a list of lists:
+        if args.polyN is not None :
+            moc=sid.mpiaMocon(geoloc, point, None, deltaTime=args.deltaTime, polyN= int(args.polyN))
+            print(moc)
