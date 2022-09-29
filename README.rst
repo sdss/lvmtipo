@@ -32,7 +32,7 @@ or from source
 
 .. |Coverage Status| image:: https://codecov.io/gh/sdss/lvmtipo/branch/main/graph/badge.svg
     :alt: Coverage Status
-    :target: https://codecov.io/gh/sdss/clu
+    :target: https://codecov.io/gh/sdss/lvmtipo
 
 .. |py| image:: https://img.shields.io/badge/python-3.7%20|%203.8%20|%203.9-blue
     :alt: Python Versions
