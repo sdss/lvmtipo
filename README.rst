@@ -31,10 +31,6 @@ or from source
     :alt: Build Status
     :target: https://github.com/sdss/lvmtipo/actions
 
-.. |Coverage Status| image:: https://codecov.io/gh/sdss/lvmtipo/branch/master/graph/badge.svg?token=i5SpR0OjLe
-    :alt: Coverage Status
-    :target: https://codecov.io/gh/sdss/lvmtipo
-
 .. |py| image:: https://img.shields.io/badge/python-3.7%20|%203.8%20|%203.9-blue
     :alt: Python Versions
     :target: https://docs.python.org/3/
