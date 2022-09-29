@@ -1,8 +1,7 @@
 lvmtipo
 ==========================================
 
-|py| |pypi| |Build Status| |docs| 
-
+|py| |pypi| |Build Status| |docs| |Coverage Status|
 ``lvmtipo`` common Telescope/Instrument Parameters & Objects for lvm
 
 Features
@@ -30,6 +29,10 @@ or from source
 .. |Build Status| image:: https://img.shields.io/github/workflow/status/sdss/lvmtipo/Test
     :alt: Build Status
     :target: https://github.com/sdss/lvmtipo/actions
+
+.. |Coverage Status| image:: https://codecov.io/gh/sdss/lvmtipo/branch/main/graph/badge.svg
+    :alt: Coverage Status
+    :target: https://codecov.io/gh/sdss/clu
 
 .. |py| image:: https://img.shields.io/badge/python-3.7%20|%203.8%20|%203.9-blue
     :alt: Python Versions
