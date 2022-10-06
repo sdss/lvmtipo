@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# @Date: 2021-11.21
+# @Date: 2022-10-06
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -24,7 +24,7 @@ __all__ = ['Siderostat']
 class Siderostat():
     """ A siderostat of 2 mirrors
     """
-    def __init__(self, zenang=90.0, azang=0.0, medSign=1) :
+    def __init__(self, zenang=90.0, azang=0.0, medSign=1, m1m2dist = 240.0) :
         """ A siderostat of 2 mirrors
         :param zenang Zenith angle of the direction of the exit beam (degrees)
                    in the range 0..180. Default is the design value of the LCO LVMT.
@@ -37,8 +37,17 @@ class Siderostat():
                        Must be either +1 or -1. Default is the LCO LVMT design (in most
                        but not all of the documentation).
         :type medSign int
+        :param m1m2dist Distance between the centers of M1 and M2 in millimeter.
+                       The default value is taken from
+                       LVM-0098_Sky Baffle Design of 2022-04-18
+                       by subracting the 84 and 60 cm distance of the
+                       output pupils to M1 and M2.
+        :type m1m2dist float
         """
 
+        # the vector b[0..2] is the three cartesian coordinates
+        # of the beam after leaving M2 in the topocentric horizontal system.
+        # b[0] is the coordinate along E, b[1] along N and b[2] up.
         if isinstance(zenang, (int,float) ) and isinstance(azang, (int,float)) :
             self.b = numpy.zeros((3))
             self.b[0] = math.sin( math.radians(azang)) * math.sin( math.radians(zenang))
@@ -46,6 +55,8 @@ class Siderostat():
             self.b[2] = math.cos( math.radians(zenang))
         else :
             raise TypeError("invalid data types")
+
+        self.m1m2len = m1m2dist
 
         if isinstance(medSign,int) :
             if medSign == 1 or medSign == -1:
@@ -379,7 +390,6 @@ class Siderostat():
                 # Scale velocity and acceleration with 2^16=65536, yerk with 2^32.
                 # We do not use acceleration and yerk (almost 0 for LVMT)
                 pos = round(rads[poly])
-
                 # rads[poly+1]-rads[poly]  is velocity in units of counts
                 # per deltaTime. Divide by deltaTime to get counts per second
                 # and multiply by 614.4e-6 to get counts per cycle.
@@ -393,4 +403,143 @@ class Siderostat():
             moc.append([0,0,round(rads[-1]),0,0])
  
         return moc
+
+    def nearTarg(t, m2=[0,0,0]):
+        '''
+        Compute azimuth and zenith angle of a nearby target following
+        https://svn.mpia.de/trac/gulli/lvmt/attachment/wiki/software/horCoordLocTarg.pdf
+        :param t is a vector of the three cartesian coordinates of the target (in the observatory)
+                in units of millimeters. t[0] is along East, t[1] along North and t[2] up.
+                The origin of the
+                coordinates is the midpoint between the middle tables.
+        :param m2 is the position of the center of M2 in the same coordinate
+                system as t. For computations which involve all 4
+                benches call this function in a loop with variable m2[0].
+                The distance of M2 to the concrete floor is 1.0 according to
+                Req-pier-6 value of the LVM-MPIA-PROC-0002_ProcurementSpec-Siderostat/LVM-MPIA-PROC-0002_Siderostat
+        :return a triple [z,A,sdist] with two angles z and A
+                in radians: zenith distance and
+                azimuth (north over east) of the direction of t as seen from M1, and
+                the distance from M1 to the target in millimeters.
+
+        A prototype of tabulating the alt-az-angles for a series
+        of calibration screens:
+
+        roof = CalibScreen()
+        for cidx in range(40):
+                # loop over 40 positions of the calibration screen west to east, millimeters
+                xt = -2000.+cidx*100.0
+                # 3D vector of where that would be under the sloping roof
+                t = roof.cartCoord(xt)
+                print("%f " % xt, end='')
+                for tidx in range(4):
+                   # tidx =0 for telescope skyw up to xidx=3 for telescope skye
+                   # The horizontal distance between the M2 pairs is 170 cm according to
+                   # SDSS-V_0111_LVMi_ICD_Telescope_to_Enclosure_Oct21_Rev-revGB.docx
+                   xm2 = -2550+1700.0*tidx
+                   # position of that M2 on the reference system
+                   M2 = [xm2 ,0,0]
+                   zA = nearTarg(t,m2=M2)
+                   print(" %f %f %f" % (math.degrees(zA[0]),math.degrees(zA[1]),zA[2]), end='')
+                print()
+        '''
+
+        # vector T measured from M2 to t with 3 Cartesian coordinates
+        T = numpy.array([t[0]-m2[0], t[1]-m2[1], t[2]-m2[2]], numpy.double)
+    
+        # second auxiliary base vector
+        bCrossT = numpy.cross(self.b, T)
+        # length second auxiliary base vector
+        lenbCrossT = numpy.linalg.norm(bCrossT)
+    
+        # third auxiliary base vector
+        bCrossTcrossb = numpy.cross(bCrossT, self.b)
+    
+        # coefficient of m along third base vector
+        alpha3 = (self.m1m2len/lenbCrossT)**2
+    
+        # coefficient of m along 2nd base vector
+        # intermediate value m^2 - alpha3^2 * length square of 3rd vector
+        alpha2 = self.m1m2len ** 2 - (alpha3 * numpy.linalg.norm(bCrossTcrossb) )**2
+        alpha2 = math.sqrt(alpha2)/lenbCrossT
+    
+        # construct vector m from M2 to M1 from known alpha-coefficients
+        m = numpy.add (
+            numpy.multiply(alpha2, bCrossT),
+            numpy.multiply(alpha3, bCrossTcrossb)
+            )
+    
+    
+        #compute vector s from M1 to target
+        s = numpy.subtract(T,m)
+        slen = numpy.linalg.norm(s)
+    
+        # normalize s to unit length
+        s = s/slen
+    
+        # zenith angle from 3rd component of normalized s-vector
+        z = math.acos(s[2])
+    
+        # azimuth from ratio of first and second component of s
+        # Note that this is correct: we do NOT use atan2(s[1],s[0]) here.
+        A = math.atan2(s[0],s[1])
+    
+        # (perhaps return math.pi-z at the end instead, the altitude?)
+        # (perhaps return a astropy sky object instead?)
+        return [z, A, slen]
+
+
+class CalibScreen():
+    """ A model of the place of the calibration screen under the LVMT roof.
+        Default parameters digitized from Fig 2-1 of 
+        SDSS-V_0111_LVMi_ICD_Telescope_to_Enclosure_Oct21_Rev-revGB.docx
+    """
+    def __init__(self, height=2184, slope=0.29157, tablOffs=460) :
+        """ This is a v-shaped geometry that helps to relate
+        positions at the ceiling above the 4 telescopes to the M2 mirrors of 
+        the telescopes.
+        :param height The maximum height of the roof (center) above the plane of
+                  the M2 mirrors in mm. Because the M2 mirrors are 1 m above the
+                  floor, the default value of 2.184m means that this is 3.184 m
+                  above the telescope platform floor.
+        :type height float
+        :param slope The inclination of the roof versus the horizontal
+                  in the usual dheight/deast differential sense. The arctan
+                  of this gives 0.283 rad = 16.25 deg.
+        :type slope float
+        :param tablOffs There is a sort of natural east-west coordinate origin
+                  in the middle between the two M2 of the sci and spec tables
+                  (that is 1700/2 = 850 mm away from both). If we use this spot as the
+                  zero-value of the x-coordinate, this tablOff is the distance
+                  (positive along East) of the top of the roof from that center.
+                  The default is that the top is 460 mm away from the origin,
+                  which means 850-460mm = 360 mm away from one and 850+460=1310 mm
+                  away from the other of the two middle telescopes.
+        :type tablOffs float
+        """
+        self.height = height
+        self.slope = slope
+        self.eastOffs = tablOffs
+
+    def cartCoord(self, xEast) :
+        """ 
+        The cartesian coordinates of a point that is in the 
+        the vertical plane of the M2 mirros and xEast millimeters
+        to the East of the mid-point between the middle two telescopes.
+        :param xEast the offset relative to the mid-point between
+               the middle two telescopes in millimeters.
+        :type xEast float
+        :return a vector of cartesian east, north and up cordinates in millimeters
+        """
+
+        # relate x coordinate to the location of the middle of the roof, east = positive
+        # assume roof is symmetric east to west
+        # So this value is zero if the position is at the maximum
+        # height of the inner side of the roof.
+        xrelRoof = abs(xEast-self.eastOffs)
+
+        # equation of z coordinate is abscisa intersection with 2.184 m above
+        # M2 and slope dz/dy
+        zcoo = self.height - self.slope*xrelRoof
+        return [xEast, 0, zcoo]
 
