@@ -31,7 +31,7 @@ or from source
     :alt: Build Status
     :target: https://github.com/sdss/lvmtipo/actions
 
-.. |Coverage Status| image:: https://codecov.io/gh/sdss/lvmtipo/branch/master/graph/badge.svg?token=i5SpR0OjLe
+.. |Coverage Status| image:: https://codecov.io/gh/sdss/lvmtipo/branch/main/graph/badge.svg
     :alt: Coverage Status
     :target: https://codecov.io/gh/sdss/lvmtipo
 
