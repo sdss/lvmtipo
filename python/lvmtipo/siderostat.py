@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# @Date: 2022-10-06
+# @Date: 2022-11-02
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -24,18 +24,20 @@ __all__ = ['Siderostat']
 class Siderostat():
     """ A siderostat of 2 mirrors
     """
-    def __init__(self, zenang=90.0, azang=0.0, medSign=1, m1m2dist = 240.0) :
+    def __init__(self, zenang=90.0, azang=0.0, medSign = -1, m1m2dist = 240.0) :
         """ A siderostat of 2 mirrors
         :param zenang Zenith angle of the direction of the exit beam (degrees)
                    in the range 0..180. Default is the design value of the LCO LVMT.
         :type zenang float
         :param azang Azimuth angle of the direction of the exit beam (degrees)
                    in the range -180..360 degrees, N=0, E=90.
-                   Default is the design value of the LCO LVMT.
+                   Ought to be zero for the LCO LVMT where the FP is north of the
+                   siderostat and 180 for the MPIA test setup where the FP is
+                   south of the siderostat..
         :type azang float
         :param medSign Sign of the meridian flip design of the mechanics.
-                       Must be either +1 or -1. Default is the LCO LVMT design (in most
-                       but not all of the documentation).
+                       Must be either +1 or -1. Default is the LCO LVMT design as build (in newer
+                       but not the older documentation).
         :type medSign int
         :param m1m2dist Distance between the centers of M1 and M2 in millimeter.
                        The default value is taken from
@@ -283,8 +285,10 @@ class Siderostat():
 
         :param homeIsWest True if the western of the two limit switches of
               the K-mirror is the home switch, false if the eastern limit
-              switch is the home switch.
-              Default is what's be in fact the cabling at MPIA in Feb 2022.
+              switch is the home switch. Here "east/west" are the topocentric
+              direction at LCO. Because the test setup at MPIA is rotated by
+              180 degrees, these meanings are the opposite at the MPIA.
+              Default is what's be in fact the cabling at MPIA in Feb 2022 and Nov 2022.
         :type bool
 
         :param homeOffset The angular difference between the K-mirror position
@@ -299,7 +303,7 @@ class Siderostat():
 
         :param stepsPerturn The number of steps to move the K-mirror
               by 360 degrees. According to information of Lars Mohr of 2021-11-25 we
-              have 100 steps per degree, 18000 microsteps per degree, which
+              have 100 steps per degree, 180 microsteps per step, 360 degrees per turn, which
               defines the default.
         :type int
 
@@ -351,18 +355,18 @@ class Siderostat():
                 # advance clock to the start of next polynomial
                 now += tdiff
  
-            # same calcuation as in the araviscam.singleFram() function
-            # action of mirror is (cos(2*m), sin(2*m);sin(2*m), -cos(2*m))
-            # where m is the mechanical mirror angle (0 if M2 is up), and
-            # if f is the direction of NCP (+delta) before the K-mirror,
-            # the x and y projections are (sin(f),cos(f)) and
-            # the direction is ( sin(2m+f), -cos(2m+f)) after the K-mirror
-            # = (sin(Pi-2m-f), cos(pi-2m-f)). Setting pi-2m-f= decNcp gives
-            # angle of 2m=pi-f-decNcp (optical, before division thru 2).
-            # The sign flip r->-r means we are DErotating, and the division
-            # through 2 is the usual optical-to-mechanical rotation angle factor.
-            # This applies factors -1/2 (sign to derotate, 1/2 for opt-mech-transf)
-            rads = [ (math.pi -r -math.radians(degNCP))/2.  for r in rads]
+            # The K-mirror flips (with its 3-mirror design) the component
+            # of incoming images parallel to the (common) incidence plane
+            # of the 3 mirrors. The component perpendicular to the incidence
+            # plane stays where it is. So the K-mirror angle component 
+            # perpendicular to the incidence plane bisects the angles of
+            # the incoming and outgoing images. Since we want to keep degNCP
+            # of the outgoing beam fixed, the bisecting angle (r+degNCP)/2
+            # defines where the component perpendicular to the incidence
+            # plane is supposed to be. Then another 90 deg rotation
+            # defines where the K-mirror "up-down" incidence plane should be,
+            # which is the (mechanical) plane of the K-mirror motor.
+            rads = [ (math.pi +r +math.radians(degNCP))/2.  for r in rads]
 
             # Use an arbitrary jump of 180 deg (that's optically 360 deg)
             # to keep trajectory near the angle of 0 (stay away from
