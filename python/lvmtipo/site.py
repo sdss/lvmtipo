@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2021-11.21
+# @Date: 2022-11-02
 # @Filename: site.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -16,6 +16,7 @@ import numpy
 import astropy.coordinates
 import astropy.time
 import astropy.units
+# import astropy.wcs
 
 
 __all__ = ['Site']
@@ -69,3 +70,23 @@ class Site():
 
     def toEarthLocation(self) :
         return astropy.coordinates.EarthLocation.from_geodetic(self.long, self.lat, height=self.alt)
+
+    def toHeader(self) :
+        """ Convert the parameters to the FITS header cards.
+        :return a set of FITS header cards.
+            Follows the Rots et al conventions of doi:10.1051/0004-6361/201424653 A&A 574 (2015) A36
+        :rtype astropy.io.fits.Header
+        """
+
+        # start with an empty set of header cards
+        wcshdr = astropy.io.fits.Header()
+
+        # add the three ITRF keywords
+        key = astropy.io.fits.Card("OBSGEO-B",self.lat,"[deg] observat. latit., N pos")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card("OBSGEO-L",self.long,"[deg] observat. longit., E pos")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card("OBSGEO-H",self.alt,"[m] observat. sea lvl. altit.")
+        wcshdr.append(key)
+        return wcshdr
+
