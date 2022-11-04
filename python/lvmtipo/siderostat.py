@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# @Date: 2022-11-02
+# @Date: 2022-11-04
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -236,8 +236,50 @@ class Siderostat():
 
         return targCtr
 
+    @staticmethod
+    def stepsToRads(steps, homeIsWest , homeOffset, stepsPerturn) :
+        """ 
+        Convert Mocon steps to position angle in radians.
+
+        :param homeIsWest True if the western of the two limit switches of
+              the K-mirror is the home switch, false if the eastern limit
+              switch is the home switch. Here "east/west" are the topocentric
+              direction at LCO. Because the test setup at MPIA is rotated by
+              180 degrees, these meanings are the opposite at the MPIA.
+              Default is what's be in fact the cabling at MPIA in Feb 2022 and Nov 2022.
+        :type bool
+
+        :param homeOffset The angular difference between the K-mirror position
+              at home and if its M2 is up, measured in degrees. This value is always positive
+              and definitely must be calibrated before this function can be used.
+              Default is an estimate from the engineering design, where the
+              hall sensor (defining home) is slightly "inside" the mechanical switch.
+              The maximum usable range (mechanically) is roughly twice that value,
+              because the two limit switches are approximately symmetrical at
+              the west and east.
+        :type float
+
+        :param stepsPerturn The number of steps to move the K-mirror
+              by 360 degrees. According to information of Lars Mohr of 2021-11-25 we
+              have 100 steps per degree, 180 microsteps per step, 360 degrees per turn. 
+              The product of these 3 numbers defines the default.
+        :type int
+
+        :return The position angle in radians equivalent to the steps.
+              Note that some TaN functions in the LVM package may return the oppositely signed angle.
+        """ 
+        stepsPerDeg = stepsPerturn / 360.0
+        if homeIsWest :
+            # angle = -135 + steps*degreesperstep
+            ang = -homeOffset + steps / stepsPerDeg
+        else :
+            # angle = 135 - steps*degreesperstep
+            ang = homeOffset - steps/ stepsPerDeg
+        return math.radians(ang)
+
     def mpiaMocon(self, site, target, ambi, degNCP=0.0, deltaTime =45.0, polyN=20, 
-                  wlen=0.5, time=None, homeIsWest = False, homeOffset = 135.0, stepsPerturn = 6480000) :
+                  wlen=0.5, time=None, stepsAtStart = 135*180*100,
+                  homeIsWest = False, homeOffset = 135.0, stepsPerturn = 360*180*100) :
         """ 
         Compute the polynomial coefficients to rotate the K-mirror for
         a total of polyN*deltaTime seconds in the future with the MPIA
@@ -280,8 +322,24 @@ class Siderostat():
         :param wlen wavelength of observation in microns
         :type wlen float
 
-        :param time start time of the derotation /UTC; if None, the current time will be used.
+        :param time start time of the derotation /UTC, the time when the first
+          polynomial in the trajectory should start; if None, the current time will be used.
         :type time
+
+        :param stepsAtStart A prefered angle in units of Mocon motor steps for the start
+          of the trajectory. The default is to start close to where the K-mirror is "up".
+          Background: the parameter degNCP leaves two choices of the motor
+          angle to map the sky to the focal plane, separated by 180 degrees,
+          because (at least ignoring K-mirror wobbles) the sky rotation is
+          twice the mechanical rotation. This parameter allows incremental
+          chaining of the trajectories to provide a hint where the previous
+          polynomial of the trajectory ended such that the algorithm here can
+          connect to that end of the trajectory as smoothly as possible. If
+          that option would not exist, an automated choice might "jump" by
+          180 degrees (mechanically) to another prefered position which might
+          lead to 360 degree rotations of the field around the pointing center
+          during exposures.
+        :type float
 
         :param homeIsWest True if the western of the two limit switches of
               the K-mirror is the home switch, false if the eastern limit
@@ -303,8 +361,8 @@ class Siderostat():
 
         :param stepsPerturn The number of steps to move the K-mirror
               by 360 degrees. According to information of Lars Mohr of 2021-11-25 we
-              have 100 steps per degree, 180 microsteps per step, 360 degrees per turn, which
-              defines the default.
+              have 100 steps per degree, 180 microsteps per step, 360 degrees per turn. 
+              The product of these 3 numbers defines the default.
         :type int
 
         :return The list of list of integer values for the MPIA motion controller
@@ -368,15 +426,16 @@ class Siderostat():
             # which is the (mechanical) plane of the K-mirror motor.
             rads = [ (math.pi +r +math.radians(degNCP))/2.  for r in rads]
 
-            # Use an arbitrary jump of 180 deg (that's optically 360 deg)
-            # to keep trajectory near the angle of 0 (stay away from
-            # the stops/limit switches at +-137 deg)
-            if rads[0] < -0.5*math.pi:
+            # Use an optional jump of 180 deg (that's optically 360 deg)
+            # to keep trajectory near the angle of stepsAtStart.
+            radsAtStart = stepsToRads(stepsAtStart, homeIsWest, homeOffset, stepsPerturn)
+
+            if rads[0] < radsAtStart -0.5*math.pi:
                 rads = [r + math.pi for r in rads]
-            elif rads[0] > 0.5*math.pi:
+            elif rads[0] > radsAtStart + 0.5*math.pi:
                 rads = [r - math.pi for r in rads]
 
-            # convert all angles from radians to counts
+            # convert all angles from radians to steps
             rads = [r *stepsPerturn/(2.0*math.pi) for r in rads]
 
             homeOffsetSteps = homeOffset * stepsPerturn / 360.0
