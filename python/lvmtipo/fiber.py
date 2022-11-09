@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2021-11.21
+# @Date: 2021-11-21
 # @Filename: fiber.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
 
 """
-Python3 class for fiber bundle names turned into field angles 
+Python3 class for fiber bundle names turned into field angles
 """
 
 
-import sys
 import math
-import unittest
+# import unittest
 
 __all__ = ['Fiber']
 
@@ -28,7 +27,7 @@ class Fiber():
     PI_3 = 1.04719755119659774615421446
 
     def __init__(self, name):
-        """ 
+        """
         :param name
             The name is one of S1-1 to S1-600, S2-1 to S2-600 and S3-1 to S3-601
             on the science IFU. One of A1-1 to A1-19, A2-1 to A2-20 and A3-1 to A3-21
@@ -50,23 +49,23 @@ class Fiber():
         # Note that there is no need to check the upper index
         # because that's done below.
         if idx < 1 :
-            raise NameError("invalid fiber name " + self.name) 
+            raise NameError("invalid fiber name " + self.name)
 
         # Start counting idx 0-based from here on (!)
         # so idx = 0-599 in S1, 0-600 in S3, 0-599 in S2
         # 0-19 in A1 or B1, 0-19 in A2 or B2, 0-20 in A3 or B3
         idx -= 1
- 
-        nameStrt = self.name[1:3]
+
+        name_strt = self.name[1:3]
         # the part of the third of the bundle that contains
         # fiber number 1 is treated specially here such
         # that afterwards the indices in the 3 sectors can be treated alike.
-        if nameStrt == '1-' :
+        if name_strt == '1-' :
             # row 0 = idx 0 to 23
             # row 1 = idx 24 to 47
             # row 24 = idx 24*24 to 599
             pass
-        elif nameStrt == '2-' :
+        elif name_strt == '2-' :
             # row 0 = idx 0 to 23
             # row 1 = idx 24 to 47
             # row 24 = idx 24*24 to 599
@@ -87,7 +86,7 @@ class Fiber():
         row = idx // pixperrow
         # if the index in the name was too large, we're not allowing it...
         if row > pixperrow :
-            raise NameError("invalid fiber name " + self.name) 
+            raise NameError("invalid fiber name " + self.name)
         idx %= pixperrow
 
         # even row = index up = outwarrds, odd row = index up = inwards
@@ -98,12 +97,12 @@ class Fiber():
         # use 3 different unit vectors along row directions and
         # at angles of 120 degrees in the hex lattice
         idx += 1
-        if nameStrt == '1-' :
+        if name_strt == '1-' :
             # for each increase of row++ (x,y) += ( sqrt(3)/2,-1/2), downwards, cos(30 deg) and sin(30deg)
             # for each increase of idx++ (x,y) += (0,1) (and offset one up)
-            x = self.SQRT3_2 * row 
+            x = self.SQRT3_2 * row
             y = -0.5* row + idx
-        elif nameStrt == '2-' :
+        elif name_strt == '2-' :
             # for each increase of row++ (x,y) += ( -sqrt(3)/2,-1/2), downwards, cos(30 deg) and sin(30deg)
             # for each increase of idx++ (x,y) += ( sqrt(3)/2, -1/2) (and offset one up)
             x = self.SQRT3_2 * ( idx - row )
@@ -125,12 +124,12 @@ class Fiber():
         """
         fidx = int(self.name[3:])
         if fidx < 1 or fidx > 12 :
-            raise NameError("invalid fiber name " + self.name) 
+            raise NameError("invalid fiber name " + self.name)
 
         # Start counting idx 0-based from here on (!) from 0 to 11
         fidx -= 1
 
-        # compute position of idx=0 and idx=1 and rotate the other by 
+        # compute position of idx=0 and idx=1 and rotate the other by
         # multiples of 60 deg.
         # angle for idx=1 is the 60 deg complement for angle of idx=0
         # P2-1 is 23 hexagons up and 6 down (at angle of 30 deg)
@@ -161,25 +160,24 @@ class Fiber():
         return self.pitch*math.sin(baseAng), self.pitch*math.cos(baseAng)
 
     def xyFocalPlane(self):
-        """ 
+        """
           Compute the position in the focal plane, where first coordinate
           is horizontally E and second coordinate up (orthogonally) .
         : return pair x,y in microns
         """
-        nameStrt = self.name[0:3]
-        if nameStrt == 'S1-' or nameStrt == 'S2-' or nameStrt == 'S3-' :
+        name_strt = self.name[0:3]
+        if name_strt in ('S1-','S2-','S3-') :
             return self.xyFocalPlaneSAB(24)
-        elif nameStrt == 'A1-' or nameStrt == 'A2-' or nameStrt == 'A3-' :
+        elif name_strt in ('A1-', 'A2-','A3-') :
             return self.xyFocalPlaneSAB(4)
-        elif nameStrt == 'B1-' or nameStrt == 'B2-' or nameStrt == 'B3-' :
+        elif name_strt in ('B1-','B2-', 'B3-') :
             return self.xyFocalPlaneSAB(4)
-        elif nameStrt == 'P1-' or nameStrt == 'P2-' :
+        elif name_strt in ('P1-', 'P2-') :
             return self.xyFocalPlaneP()
-        else :
-            raise NameError("invalid fiber name " + self.name) 
+        raise NameError("invalid fiber name " + self.name)
 
     def labAngle(self):
-        """ 
+        """
         :return the laboratory angle (direction in the local FP) in radians
             The angle 0 is up, and +90 deg (in radians) is horizontally to the E,
             i.e. to the right in the front view of the fiber bundle.

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2021-11.21
+# @Date: 2022-11-07
 # @Filename: homtrans.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -9,13 +9,7 @@
 Python3 class for siderostat field angles using homogeneous coordinates
 """
 
-import sys
-import math
 import numpy
-import astropy.coordinates
-import astropy.time
-import astropy.units
-
 
 __all__ = ['HomTrans']
 
@@ -35,7 +29,7 @@ class HomTrans():
 
 
     def multiply(self, rhs):
-        """ 
+        """
         :param rhs The transformation to the right of the multiplication
                    sign. So rhs is applied before this transformation.
         :type HomTrans
@@ -49,14 +43,13 @@ class HomTrans():
         elif isinstance(rhs, numpy.ndarray) :
             prod = numpy.matmul(self.matr,rhs)
             return HomTrans(prod)
-        else :
-            raise TypeError("invalid data types")
+        raise TypeError("invalid data types")
 
     def apply(self, rhs):
-        """ 
+        """
         Apply self transformation to a vector of coordinates.
         :param rhs The vector. If it has only the standard 3 coordinates,
-                   a virtual 1 is appended before applying the transformation. 
+                   a virtual 1 is appended before applying the transformation.
         :type numpy.ndarray of dimension 1
         :return a numpy.ndarray with a vector of 3 (standard, projected) Cartesian coordinates.
         """
@@ -70,5 +63,5 @@ class HomTrans():
 
                 prod /= prod[3]
                 return numpy.array([prod[0],prod[1],prod[2]],numpy.double)
-            else:
-                raise TypeError("rhs not  a vector")
+            raise TypeError("rhs not  a vector")
+        raise TypeError("rhs not numpy array")
