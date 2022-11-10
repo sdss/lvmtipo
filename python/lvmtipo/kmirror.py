@@ -65,3 +65,25 @@ class Kmirror():
             # angle = 135 - steps*degreesperstep
             ang = self.home_offset - steps / self.steps_per_deg
         return math.radians(ang)
+
+    def radians_to_steps(self, rads) :
+        """
+        Convert radians of position angle to Mocon steps
+        Inverse function to steps_to_radians().
+
+        :param rads: position angle in radians. 0 if middle mirror up.
+        :type rads: float
+
+        :return: The steps  equivalent to the position angle
+              Note that some TaN functions in the LVM package may return the oppositely signed angle.
+        :rtype: int
+        """
+        if self.home_is_west :
+            # angle = -135 + steps*degreesperstep
+            # steps = (angle +135)/degreesperstep
+            stp = (math.degrees(rads) + self.home_offset)*self.steps_per_deg
+        else:
+            # angle = 135 - steps*degreesperstep
+            # steps = (135- angle)/degreeperstep
+            stp = (self.home_offset - math.degrees(rads))*self.steps_per_deg
+        return int(stp+0.5)

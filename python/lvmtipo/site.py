@@ -6,13 +6,14 @@
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
 """
-Python3 class for siderostat field angles using homogeneous coordinates
+Python3 class for mapping of observatory names to geographic coordinates
 
 """
 
 import astropy.coordinates
 import astropy.time
 import astropy.units
+import astropy.io.fits
 # import astropy.wcs
 
 

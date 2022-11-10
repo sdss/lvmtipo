@@ -168,11 +168,11 @@ class Fiber():
         name_strt = self.name[0:3]
         if name_strt in ('S1-','S2-','S3-') :
             return self.xyFocalPlaneSAB(24)
-        elif name_strt in ('A1-', 'A2-','A3-') :
+        if name_strt in ('A1-', 'A2-','A3-') :
             return self.xyFocalPlaneSAB(4)
-        elif name_strt in ('B1-','B2-', 'B3-') :
+        if name_strt in ('B1-','B2-', 'B3-') :
             return self.xyFocalPlaneSAB(4)
-        elif name_strt in ('P1-', 'P2-') :
+        if name_strt in ('P1-', 'P2-') :
             return self.xyFocalPlaneP()
         raise NameError("invalid fiber name " + self.name)
 

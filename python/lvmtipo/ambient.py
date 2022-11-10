@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2021-11.21
+# @Date: 2022-11-09
 # @Filename: ambient.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
 """
-Python3 class for siderostat field angles using homogeneous coordinates
+Python3 class collecting parameters relevant to transverse atmospheric refraction
 """
 
 import math

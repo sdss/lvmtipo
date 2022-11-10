@@ -14,10 +14,13 @@ import numpy
 import astropy.coordinates
 import astropy.time
 import astropy.units
+import astropy.io.fits
 
 from lvmtipo.mirror import Mirror
 from lvmtipo.target import Target
 from lvmtipo.kmirror import Kmirror
+from lvmtipo.fiber import Fiber
+from lvmtipo.site import Site
 
 __all__ = ['Siderostat']
 
@@ -154,17 +157,17 @@ class Siderostat():
         # image of targNcp while hitting M1
         m1img = trans.apply(m2tom1)
         # image of targNcp before arriving at M1
-        starOffm1 = m2tom1 + starNcp
-        starimg = trans.apply(starOffm1)
+        star_off_m1 = m2tom1 + starNcp
+        starimg = trans.apply(star_off_m1)
 
         # virtual direction of ray as seen from point after M2
         # no need to normalize this because the atan2 will do...
         starvirt = m1img - starimg
 
         # project in a plane orthogonal to  self.b
-        cosFang = numpy.dot(starvirt, self.box)
-        sinFang = numpy.dot(starvirt, self.boy)
-        return math.atan2(sinFang, cosFang)
+        cos_fang = numpy.dot(starvirt, self.box)
+        sin_fang = numpy.dot(starvirt, self.boy)
+        return math.atan2(sin_fang, cos_fang)
 
     def to_header(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
            genrevx, genrevy, kmirr, time=None,
@@ -233,7 +236,8 @@ class Siderostat():
         :rtype astropy.io.fits.Header
         """
         # start with an empty set of header cards
-        wcshdr = astropy.io.fits.Header()
+        # wcshdr = astropy.io.fits.Header()
+        wcshdr = site.to_Header()
 
         # compute the position angle (NCP) after the siderostat
         # and before the K-mirror in radians.
@@ -252,7 +256,11 @@ class Siderostat():
         # the camera (which uses upper case for some letter).
         ag_cam_name = ag_cam_name.lower()
         # three LVMT benches have a K-mirror, one has not
-        if ag_cam_name.find('skye') >= 0 or ag_cam_name.find('skyw') >= 0 or ag_cam_name.find('sci') >= 0:
+        if kmirr is None:
+           # this will eventually be the case of the spec-telescope
+           pass
+        else:
+           # this will eventually be the case of the sci, skye, skyw telescopes
             n_refl += 3
 
             # convert K-mirror orientation to radians
@@ -264,10 +272,17 @@ class Siderostat():
             # (ang_in+ang_out)/2 = kangle+-pi/2
             # ang_out = 2*kangle+-pi - ang_in
             ang = math.pi + 2.*kangle - ang
-        elif ag_cam_name.find('spec') >= 0:
-            pass
-        else:
-            raise NameError("Unrecognized camera name " + ag_cam_name)
+
+        # if ag_cam_name.find('skye') >= 0 :
+        #     tele='skye'
+        # elif ag_cam_name.find('skyw') >= 0 :
+        #     tele='skyw'
+        # elif ag_cam_name.find('sci') >= 0 :
+        #     tele='sci'
+        # else
+        #     tele='spec'
+        # key = astropy.io.fits.Card("TELESCOP", tele, " sci, skye, skyw, or spec")
+        # wcshdr.append(key)
 
         if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
             # no prism
@@ -301,6 +316,15 @@ class Siderostat():
             ang += math.pi/2.0
         else:
             raise NameError("Unrecognized camera name " + ag_cam_name)
+
+        if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
+            tele += '.agc'
+        elif ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
+            tele += '.agw'
+        elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0:
+            tele += '.age'
+        key = astropy.io.fits.Card("CAMERA", tele, " AG camera on the bench")
+        wcshdr.append(key)
 
         # assign an image parity defined by the number of mirror reflections
         if (n_refl % 2) == 0:
@@ -450,15 +474,20 @@ class Siderostat():
         angle relativ to the nominal target...
         :param site: location of the observatory
         :type site: fieldrotation.Site
+
         :param target: sidereal target in ra/dec
         :type target: astropy.coordinates
+
         :param ambi: Ambient data relevant for refractive index
         :type ambi:
+
         :param fib: One of the fibers in one of the 4 tables
         :type fib: Fiber
+
         :param flen: Focal length (defining th eplate scale) in mm
                     This should be the same as in the YAML file of the cameras...
         :type flen: float
+
         :param time: time of the observation /UTC; if None, the current time will be used.
         :type time:
         :return a new target which is in the fiber bundle center when target is at the fiber
@@ -530,6 +559,8 @@ class Siderostat():
               a fiber selector.
               A value of zero means the +delta is up in the laboratory,
               the value +90 means the +delta direction is right (horizontally E)
+              If this is a fiber, the direction from the center of the fiber bundle
+              to that fiber is implied.
         :type degNCP: float
 
         :param deltaTime: Time covered by a single polynomial in seconds
@@ -608,6 +639,15 @@ class Siderostat():
           means whether they are in a zenith angle < 60 deg or above the horizon
           at that epoch or date.
         """
+
+        # in case the angle is implicitly coded as a fiber, take the fiber
+        # position as the desired angle in the focal plane. From here on
+        # posang_fp is in radians.
+        if isinstance(degNCP, Fiber) :
+            posang_fp = degNCP.labAngle()
+        else:
+            posang_fp = math.radians(degNCP)
+
         moc=[]
         if polyN > 0:
             if isinstance(time, astropy.time.Time):
@@ -651,29 +691,23 @@ class Siderostat():
             # plane is supposed to be. Then another 90 deg rotation
             # defines where the K-mirror "up-down" incidence plane should be,
             # which is the (mechanical) plane of the K-mirror motor.
-            rads=[(math.pi + r + math.radians(degNCP))/2. for r in rads]
+            rads=[(math.pi + r + posang_fp)/2. for r in rads]
 
             # Use an optional jump of 180 deg (that's optically 360 deg)
             # to keep trajectory near the angle of stepsAtStart.
-            kmirr = Kmirror(home_is_west = homeIsWest, home_offset = homeOffset, steps_per_turn=stepsPerturn)
-            radsAtStart= kmirr.steps_to_radians( stepsAtStart)
+            kmirr = Kmirror(home_is_west = homeIsWest, home_offset = homeOffset, 
+                steps_per_turn=stepsPerturn)
+            radsAtStart = kmirr.steps_to_radians(stepsAtStart)
 
+            # if we are too far away from the desired initial position,
+            # add or subtract 180 degrees .
             if rads[0] < radsAtStart - 0.5*math.pi:
                 rads=[r + math.pi for r in rads]
             elif rads[0] > radsAtStart + 0.5*math.pi:
                 rads=[r - math.pi for r in rads]
 
             # convert all angles from radians to steps
-            rads=[r * stepsPerturn/(2.0*math.pi) for r in rads]
-
-            homeOffsetSteps=homeOffset * stepsPerturn / 360.0
-            # convert all counts measured from 0=up to counts
-            # relative to the home/reference position of the MoCon
-            if homeIsWest:
-                rads=[r + homeOffsetSteps for r in rads]
-            else:
-                rads=[homeOffsetSteps - r for r in rads]
-
+            rads=[ kmirr.radians_to_steps(r) for r in rads]
 
             # 1 cycle = 614.4 microsecs, see section 9.3 of MoCon User's Guide
             cycsteps=deltaTime/614.4e-6
@@ -681,10 +715,12 @@ class Siderostat():
                 # Scale velocity and acceleration with 2^16=65536, yerk with 2^32.
                 # We do not use acceleration and yerk (almost 0 for LVMT)
                 pos=round(rads[poly])
+
                 # rads[poly+1]-rads[poly]  is velocity in units of counts
                 # per deltaTime. Divide by deltaTime to get counts per second
                 # and multiply by 614.4e-6 to get counts per cycle.
                 vel=round(65536*(rads[poly+1]-rads[poly])/cycsteps)
+
                 # Note the order: duration, velocity is before position....
                 traj=[round(cycsteps), vel, pos, 0, 0]
                 moc.append(traj)
@@ -737,10 +773,10 @@ class Siderostat():
         '''
 
         # vector T measured from M2 to t with 3 Cartesian coordinates
-        T=numpy.array([t[0]-m2[0], t[1]-m2[1], t[2]-m2[2]], numpy.double)
+        m2_to_t=numpy.array([t[0]-m2[0], t[1]-m2[1], t[2]-m2[2]], numpy.double)
 
         # second auxiliary base vector
-        bCrossT=numpy.cross(self.b, T)
+        bCrossT=numpy.cross(self.b, m2_to_t)
         # length second auxiliary base vector
         lenbCrossT=numpy.linalg.norm(bCrossT)
 
@@ -764,7 +800,7 @@ class Siderostat():
 
 
         # compute vector s from M1 to target
-        s=numpy.subtract(T, m)
+        s=numpy.subtract(m2_to_t, m)
         slen=numpy.linalg.norm(s)
 
         # normalize s to unit length
@@ -787,7 +823,7 @@ class CalibScreen():
         Default parameters digitized from Fig 2-1 of
         SDSS-V_0111_LVMi_ICD_Telescope_to_Enclosure_Oct21_Rev-revGB.docx
     """
-    def __init__(self, height=2184, slope=0.29157, tablOffs=460):
+    def __init__(self, height=2184, slope=0.29157, tabl_off=460):
         """ This is a v-shaped geometry that helps to relate
         positions at the ceiling above the 4 telescopes to the M2 mirrors of
         the telescopes.
@@ -802,7 +838,7 @@ class CalibScreen():
                   of this gives 0.283 rad = 16.25 deg.
         :type slope: float
 
-        :param tablOffs: There is a sort of natural east-west coordinate origin
+        :param tabl_off: There is a sort of natural east-west coordinate origin
                   in the middle between the two M2 of the sci and spec tables
                   (that is 1700/2 = 850 mm away from both). If we use this spot as the
                   zero-value of the x-coordinate, this tablOff is the distance
@@ -810,11 +846,11 @@ class CalibScreen():
                   The default is that the top is 460 mm away from the origin,
                   which means 850-460mm = 360 mm away from one and 850+460=1310 mm
                   away from the other of the two middle telescopes.
-        :type tablOffs: float
+        :type tabl_off: float
         """
         self.height=height
         self.slope=slope
-        self.eastOffs=tablOffs
+        self.east_off=tabl_off
 
     def cart_coord(self, x_east_pos):
         """
@@ -831,7 +867,7 @@ class CalibScreen():
         # assume roof is symmetric east to west
         # So this value is zero if the position is at the maximum
         # height of the inner side of the roof.
-        x_rel_roof=abs(x_east_pos-self.eastOffs)
+        x_rel_roof=abs(x_east_pos-self.east_off)
 
         # equation of z coordinate is abscisa intersection with 2.184 m above
         # M2 and slope dz/dy
