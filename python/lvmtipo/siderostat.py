@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-11-04
+# @Date: 2022-11-11
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -15,6 +15,7 @@ import astropy.coordinates
 import astropy.time
 import astropy.units
 import astropy.io.fits
+import astropy.wcs
 
 from lvmtipo.mirror import Mirror
 from lvmtipo.target import Target
@@ -224,6 +225,7 @@ class Siderostat():
         :type time:
 
         :param kmirr: K-mirror constants related to conversions of steps to angles
+             May be None to indicate that there is no K-mirror (like for the spec telescope)
         :type kmirr: lvmtipo.Kmirror
 
         :param dist_cam_edge: the distance of the long east or west FLIR camera edge to
@@ -235,12 +237,12 @@ class Siderostat():
         :return a set of FITS header cards with WCS keywords.
         :rtype astropy.io.fits.Header
         """
-        # start with an empty set of header cards
-        # wcshdr = astropy.io.fits.Header()
+
+        # start with set of header cards of geographics of the observatory
         wcshdr = site.to_Header()
 
         # compute the position angle (NCP) after the siderostat
-        # and before the K-mirror in radians.
+        # (before the K-mirror) in radians.
         if isinstance(time, astropy.time.Time):
             now = time
         elif isinstance(time, str):
@@ -255,12 +257,14 @@ class Siderostat():
         # Simplify the interface by also recognizing the descr of
         # the camera (which uses upper case for some letter).
         ag_cam_name = ag_cam_name.lower()
+
         # three LVMT benches have a K-mirror, one has not
         if kmirr is None:
-           # this will eventually be the case of the spec-telescope
-           pass
+            # this will eventually be the case of the spec-telescope
+            # the angle passes unchanged
+            pass
         else:
-           # this will eventually be the case of the sci, skye, skyw telescopes
+            # this will eventually be the case of the sci, skye, skyw telescopes
             n_refl += 3
 
             # convert K-mirror orientation to radians
@@ -273,16 +277,17 @@ class Siderostat():
             # ang_out = 2*kangle+-pi - ang_in
             ang = math.pi + 2.*kangle - ang
 
-        # if ag_cam_name.find('skye') >= 0 :
-        #     tele='skye'
-        # elif ag_cam_name.find('skyw') >= 0 :
-        #     tele='skyw'
-        # elif ag_cam_name.find('sci') >= 0 :
-        #     tele='sci'
-        # else
-        #     tele='spec'
-        # key = astropy.io.fits.Card("TELESCOP", tele, " sci, skye, skyw, or spec")
-        # wcshdr.append(key)
+        tele=''
+        if ag_cam_name.find('skye') >= 0 :
+            tele='skye'
+        elif ag_cam_name.find('skyw') >= 0 :
+            tele='skyw'
+        elif ag_cam_name.find('sci') >= 0 :
+            tele='sci'
+        else:
+            tele='spec'
+        key = astropy.io.fits.Card("TELESCOP", tele, " sci, skye, skyw, or spec")
+        wcshdr.append(key)
 
         if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
             # no prism
@@ -308,8 +313,8 @@ class Siderostat():
             ang *= -1.0
             n_refl += 1
             # assume camera is mounted vertically with the long lower edge
-            # pointing north (basically rotated 180 deg around the vertical
-            # axis relative to the west camera) toward the focal plane
+            # pointing south (basically rotated 180 deg around the horizontal
+            # axis relative to the west camera) away from the FP.
             # We want to express an angle where the reference is "up" to an
             # angle where the reference "right" or geographically "to the south"
             # (passive rotation)
@@ -326,11 +331,8 @@ class Siderostat():
         key = astropy.io.fits.Card("CAMERA", tele, " AG camera on the bench")
         wcshdr.append(key)
 
-        # assign an image parity defined by the number of mirror reflections
-        if (n_refl % 2) == 0:
-            imgparity = True
-        else:
-            imgparity = False
+        # assign an image parity defined by the even/odd number of mirror reflections
+        imgparity = True if ( (n_refl % 2) == 0 ) else False
 
         # up to here ang is refering to the short-edge-up orientation
         # of the camera if that were read out by streaming the araviscam
@@ -374,17 +376,19 @@ class Siderostat():
             "CRVAL2", target.dec.degree, "[deg] Dec at reference pixel")
         wcshdr.append(key)
 
-        # convert disgtcamEdgeCtr from mm to pixels
-        # this is the distance from the long edge that is narrowest to
+        # convert disgtcamEdgeCtr from mm to micron and then to pixels
+        # This is the distance from the long edge that is narrowest to
         # the fiber center after projection into the focal plane.
         dist_cam_edge *= 1000.0 / (camera.pixsize*camera.binning[1])
+
         # distance from the middle of the east or west camera to fiber ctner in pixels
         dist_cam_mid = camera.detector_size.hd / \
             2 / camera.binning[1] + dist_cam_edge
 
         # where is the center of image away in the pixel coordinate system
-        # of the camera? For the x-position this is in the middel of the
+        # of the camera? For the x-position this is in the middle of the
         # camera along the long axis because all cameras are installed up-down
+        # For age and agw the wd parameters are 1600 and the hd 1100 (not binned).
         crpix1 = camera.detector_size.wd / 2 / camera.binning[0] + 0.5
         crpix2 = camera.detector_size.hd / 2 / camera.binning[1] + 0.5
         if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0 :
@@ -399,11 +403,11 @@ class Siderostat():
                 crpix2 -= dist_cam_mid
         elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0 :
             # the direction from the prism center to the fiber center
-            # is walkign west, which is in the camera walking to the upper edge
+            # is walkign west, which is in the camera walking to the lower edge
             if genrevy:
-                crpix2 -= dist_cam_mid
-            else:
                 crpix2 += dist_cam_mid
+            else:
+                crpix2 -= dist_cam_mid
 
         key=astropy.io.fits.Card(
             "CRPIX1", crpix1, "[px] point cntr along axis 1")
@@ -456,6 +460,78 @@ class Siderostat():
 
         return wcshdr
 
+    def to_wcs(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
+           genrevx, genrevy, kmirr, time=None,
+           dist_cam_edge=11.14771):
+        """ Convert the parameters to FITS WCS header cards.
+        This traces the position angle implied by the siderostat and number of mirror
+        reflections through the K-mirror if applicable and through the
+        prisms if applicable to predict the key WCS keywords. The main difference
+        to the implementation in lvmcam/python/lvmcam/models/wcs.py
+        is that the variable genvrev[xy] are included in this computation.
+        .. warn:: this assumes that the FITS files are read out as
+           in the MPIA test setup: all east/west/center cameras with the
+           long edge up-down, no rotation by any 90 or 180 degrees in any
+           python software that may spring up after Oct 2022.
+
+        :param site: geographic ITRF location of the observatory
+        :type site: lvmtipo.Site
+
+        :param target: sidereal target in ra/dec
+        :type target: astropy.coordinates
+
+        :param camera: the scales in the image, pixel and binning etc
+        :type camera: SkymakerCamera
+
+        :param ambi: Ambient data relevant for refractive index
+        .. warn:: The pixel scales in the center camera are wrong as of 2022-11-04
+                  because the configuration yml files do not contain the correct 4.5 um
+        :type ambi: lvmtipo.Ambient
+
+        :param k_mocon_steps: The location of the K-mirror at the time
+             in units of Mocon steps. We avoid the use of bare angles because
+             various different conventions are in use for this instrument,
+             both with respect to sign and with respect to mechanical vs
+             optical angles.
+             For one of the three benches (hidden in ag_cam_name) this is
+             a dummy argument because there is no K-mirror.
+        :type k_mocon_steps: int
+
+        :param ag_cam_name: The telescope (skye, skyw, spec, sci) and camera
+             location (age, agw, agc) or (east, west, center)
+             of the FLIR camera that took the image. The string must be some
+             concatenation of both names.
+        :type ag_cam_name: string
+
+        :param genrevx: True if the readout direction along x was reversed
+             in the araviscam interface before creating the FITS file.
+        :type genrevx: bool
+
+        :param genrevy: True if the readout direction along y was reversed
+             in the araviscam interface before creating the FITS file.
+        :type genrevy: bool
+
+        :param time: time of the observation /UTC; if None, the current time will be used.
+        :type time:
+
+        :param kmirr: K-mirror constants related to conversions of steps to angles
+             May be None to indicate that there is no K-mirror (like for the spec telescope)
+        :type kmirr: lvmtipo.Kmirror
+
+        :param dist_cam_edge: the distance of the long east or west FLIR camera edge to
+             the fiber bundle centre in millimeters
+             Is 7.144+4.0 mm according to SDSS-V_0110 figure 6
+             and 11.14471 according to figure 3-1 of LVMi-0081
+        :type dist_cam_edge: float
+
+        :return: a set of astropy WCS keywords.
+        :rtype: astropy.wcs.WCS
+        """
+
+        hdr= self.to_header(site, target, camera, ambi, k_mocon_steps, ag_cam_name,
+           genrevx, genrevy, kmirr, time, dist_cam_edge )
+
+        return astropy.wcs.WCS(hdr)
 
     def centrTarg(self, site, target, ambi, fib, flen=1839.8, time=None):
         """
@@ -473,7 +549,7 @@ class Siderostat():
         the center of the fiber bundle as a distance and position
         angle relativ to the nominal target...
         :param site: location of the observatory
-        :type site: fieldrotation.Site
+        :type site: lvmtipo.Site
 
         :param target: sidereal target in ra/dec
         :type target: astropy.coordinates
@@ -490,7 +566,7 @@ class Siderostat():
 
         :param time: time of the observation /UTC; if None, the current time will be used.
         :type time:
-        :return a new target which is in the fiber bundle center when target is at the fiber
+        :return: a new target which is in the fiber bundle center when target is at the fiber
         """
 
         # direction to NCP from target in the FP orientation (=0 if NCP=up)
@@ -546,7 +622,7 @@ class Siderostat():
         format [[time0,vel0,pol0,acce0,jer0],[time1,vel1,],[],...]
 
         :param site: location of the observatory
-        :type site: fieldrotation.Site
+        :type site: lvmtipo.Site
 
         :param target: sidereal target in ra/dec
         :type target: astropy.coordinates.SkyCoord
@@ -695,7 +771,7 @@ class Siderostat():
 
             # Use an optional jump of 180 deg (that's optically 360 deg)
             # to keep trajectory near the angle of stepsAtStart.
-            kmirr = Kmirror(home_is_west = homeIsWest, home_offset = homeOffset, 
+            kmirr = Kmirror(home_is_west = homeIsWest, home_offset = homeOffset,
                 steps_per_turn=stepsPerturn)
             radsAtStart = kmirr.steps_to_radians(stepsAtStart)
 
