@@ -59,7 +59,7 @@ class Target():
         if isinstance(site, Site):
             if ambi is None:
                 refr = Ambient(site=site)
-            elif isinstance(site, Ambient):
+            elif isinstance(ambi, Ambient):
                 refr = ambi
             else:
                 raise TypeError("invalid ambi data type")

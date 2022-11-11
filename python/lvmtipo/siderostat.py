@@ -16,12 +16,15 @@ import astropy.time
 import astropy.units
 import astropy.io.fits
 import astropy.wcs
+# import skymakercam # circular import !?!
+# from skymakercam import SkymakerCam
 
 from lvmtipo.mirror import Mirror
 from lvmtipo.target import Target
 from lvmtipo.kmirror import Kmirror
 from lvmtipo.fiber import Fiber
 from lvmtipo.site import Site
+from lvmtipo.ambient import Ambient
 
 __all__ = ['Siderostat']
 
@@ -171,7 +174,7 @@ class Siderostat():
         return math.atan2(sin_fang, cos_fang)
 
     def to_header(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
-           genrevx, genrevy, kmirr, time=None,
+           genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,flen=1839.8,
            dist_cam_edge=11.14771):
         """ Convert the parameters to FITS WCS header cards.
         This traces the position angle implied by the siderostat and number of mirror
@@ -191,6 +194,7 @@ class Siderostat():
         :type target: astropy.coordinates
 
         :param camera: the scales in the image, pixel and binning etc
+            Can be None, but then the pixsize, bin, wd, hd and flen parameters must be set
         :type camera: SkymakerCamera
 
         :param ambi: Ambient data relevant for refractive index
@@ -224,6 +228,26 @@ class Siderostat():
         :param time: time of the observation /UTC; if None, the current time will be used.
         :type time:
 
+        :param pixsize: pixel size in microns, not binned
+              Can be None if camera has this information
+        :type pixsize: float
+
+        :param bin: binning factor in the image
+              Can be None if camera has this information
+        :type bin: int
+
+        :param wd: width of the image in pixels (after binning)
+              Can be None if camera has this information
+        :type wd: int
+
+        :param hd: height of the image in pixels (after binning)
+              Can be None if camera has this information
+        :type hd: int
+
+        :param flen: focal lens of lens in mm.
+              Can be None if camera has this information
+        :type flen: float
+
         :param kmirr: K-mirror constants related to conversions of steps to angles
              May be None to indicate that there is no K-mirror (like for the spec telescope)
         :type kmirr: lvmtipo.Kmirror
@@ -239,7 +263,7 @@ class Siderostat():
         """
 
         # start with set of header cards of geographics of the observatory
-        wcshdr = site.to_Header()
+        wcshdr = site.to_header()
 
         # compute the position angle (NCP) after the siderostat
         # (before the K-mirror) in radians.
@@ -370,27 +394,38 @@ class Siderostat():
         key = astropy.io.fits.Card("CTYPE2", "DEC--TAN", "WCS type axis 2")
         wcshdr.append(key)
         key = astropy.io.fits.Card(
-            "CRVAL1", target.ra.degree, "[deg] RA at reference pixel")
+            "CRVAL1", target.targ.ra.degree, "[deg] RA at reference pixel")
         wcshdr.append(key)
         key = astropy.io.fits.Card(
-            "CRVAL2", target.dec.degree, "[deg] Dec at reference pixel")
+            "CRVAL2", target.targ.dec.degree, "[deg] Dec at reference pixel")
         wcshdr.append(key)
 
         # convert disgtcamEdgeCtr from mm to micron and then to pixels
         # This is the distance from the long edge that is narrowest to
         # the fiber center after projection into the focal plane.
-        dist_cam_edge *= 1000.0 / (camera.pixsize*camera.binning[1])
+        if camera is None:
+            dist_cam_edge *= 1000.0 / (pixsize*bin)
+        else:
+            dist_cam_edge *= 1000.0 / (camera.pixsize*camera.binning[1])
 
         # distance from the middle of the east or west camera to fiber ctner in pixels
-        dist_cam_mid = camera.detector_size.hd / \
-            2 / camera.binning[1] + dist_cam_edge
-
+        if camera is None:
+            dist_cam_mid = hd / 2 + dist_cam_edge
+        else:
+            dist_cam_mid = camera.detector_size.hd / \
+                2 / camera.binning[1] + dist_cam_edge
+    
         # where is the center of image away in the pixel coordinate system
         # of the camera? For the x-position this is in the middle of the
         # camera along the long axis because all cameras are installed up-down
         # For age and agw the wd parameters are 1600 and the hd 1100 (not binned).
-        crpix1 = camera.detector_size.wd / 2 / camera.binning[0] + 0.5
-        crpix2 = camera.detector_size.hd / 2 / camera.binning[1] + 0.5
+        if camera is None:
+            crpix1 = wd / 2 + 0.5
+            crpix2 = hd / 2 + 0.5
+        else :
+            crpix1 = camera.detector_size.wd / 2 / camera.binning[0] + 0.5
+            crpix2 = camera.detector_size.hd / 2 / camera.binning[1] + 0.5
+    
         if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0 :
             # ra/dec in the center of the image
             pass
@@ -417,8 +452,19 @@ class Siderostat():
         wcshdr.append(key)
 
         # the two main values in the CD matrix, irrespective of sign
-        cosperpix = camera.degperpix*math.cos(ang)
-        sinperpix = camera.degperpix*math.sin(ang)
+        if camera is None:
+            # plate scale, microns in the focal plane per radian on the sky
+            # image scale at focus is 8.92 um/arcsec = 8.92um/(pi/180/3600 rad) =1.8e^6 um/rad
+            pscal=1000.*flen
+            # plate scale, pixels in the focal plane per radian on the sky
+            pscal /= pixsize
+            # plate scale, pixels in the focal plane per degrees on the sky
+            pscal = math.radians(pscal)
+            cosperpix = math.cos(ang)/pscal
+            sinperpix = math.sin(ang)/pscal
+        else:
+            cosperpix = camera.degperpix*math.cos(ang)
+            sinperpix = camera.degperpix*math.sin(ang)
         # suppose the parity is positive and ang is small, then  in matrix notation
         # ( x)     ( sin ang, -cos ang ) (delta)
         #       =
@@ -461,18 +507,10 @@ class Siderostat():
         return wcshdr
 
     def to_wcs(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
-           genrevx, genrevy, kmirr, time=None,
+           genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,flen=1839.8,
            dist_cam_edge=11.14771):
-        """ Convert the parameters to FITS WCS header cards.
-        This traces the position angle implied by the siderostat and number of mirror
-        reflections through the K-mirror if applicable and through the
-        prisms if applicable to predict the key WCS keywords. The main difference
-        to the implementation in lvmcam/python/lvmcam/models/wcs.py
-        is that the variable genvrev[xy] are included in this computation.
-        .. warn:: this assumes that the FITS files are read out as
-           in the MPIA test setup: all east/west/center cameras with the
-           long edge up-down, no rotation by any 90 or 180 degrees in any
-           python software that may spring up after Oct 2022.
+        """ Convert the parameters to astropy WCS information.
+        This is a simple convenience wrapper around to_header().
 
         :param site: geographic ITRF location of the observatory
         :type site: lvmtipo.Site
@@ -514,6 +552,26 @@ class Siderostat():
         :param time: time of the observation /UTC; if None, the current time will be used.
         :type time:
 
+        :param pixsize: pixel size in microns, not binned
+              Can be None if camera has this information
+        :type pixsize: float
+
+        :param bin: binning factor in the image
+              Can be None if camera has this information
+        :type bin: int
+
+        :param wd: width of the image in pixels (after binning)
+              Can be None if camera has this information
+        :type wd: int
+
+        :param hd: height of the image in pixels (after binning)
+              Can be None if camera has this information
+        :type hd: int
+
+        :param flen: focal lens of lens in mm.
+              Can be None if camera has this information
+        :type flen: float
+
         :param kmirr: K-mirror constants related to conversions of steps to angles
              May be None to indicate that there is no K-mirror (like for the spec telescope)
         :type kmirr: lvmtipo.Kmirror
@@ -529,9 +587,85 @@ class Siderostat():
         """
 
         hdr= self.to_header(site, target, camera, ambi, k_mocon_steps, ag_cam_name,
-           genrevx, genrevy, kmirr, time, dist_cam_edge )
+           genrevx, genrevy, kmirr, time=time,pixsize=pixsize,bin=bin,wd=wd,hd=hd,flen=flen,
+           dist_cam_edge=dist_cam_edge )
 
         return astropy.wcs.WCS(hdr)
+
+    def update_fits(self, fits_in, fits_out):
+        """
+        Update the WCS header cards of an existing FITS file with
+        computed a-priori parameters  found in the header.
+        This is essentially a tester for existing FITS files so the result can
+          be compared with astrometry.net solutions.
+        ..warn..: this works only assuming that some standard conventions in the
+            header data (as applying in Nov 2022) are met.
+        :param fits_in: existing fits file name on local disks
+        :type fits_in: str
+        :param fits_in: file name of non-existing FITS file on local disks to be created
+        ..warn.. : creation of the file is note yet implemented
+        :type fits_out: str
+        :return: a set of astropy WCS keywords computed from the other header keywords.
+        :rtype: astropy.wcs.WCS
+        ..todo..: should probably put in the __main__ of the fieldrotation sample
+        """
+
+        # grab header of PHDU of fits_in
+        hdu = astropy.io.fits.open(fits_in)
+        hdr = hdu[0].header
+        # extract all the wcs-relevant data
+
+        # this is MPIA or LCO
+        observat = hdr['OBSERVAT'].strip()
+        site = Site(name=observat)
+
+        # ra and dec in degrees
+        ra = hdr['RA'] 
+        dec = hdr['DEC'] 
+
+        # horizontal and vertical flips in the image
+        genrevx = hdr['GENREVX'] 
+        genrevy = hdr['GENREVY'] 
+        # K-mirror position
+        kmang = -hdr['KMIRDROT'] # the Briegel angles are the opposite of our positian angles
+        time = hdr['DATE-OBS'] # may be wrong by 35 seconds 
+        # binning factor 1,2,4
+        bin = hdr['BINX']
+        # FLIR camera type (to deduce the pixel size in microns)
+        flirtyp = hdr['CAMTYPE']
+        ag_cam_name = hdr['CAMNAME'].strip()
+
+        # some less important data to build a refractivity model
+        celsius = hdr['BENTEMP']
+        relhum = hdr['BENHUM']
+        pres = hdr['BENPRESS']
+
+        # binned size of the image
+        wd=hdr['NAXIS1']
+        hd=hdr['NAXIS2']
+
+        kmirr = Kmirror()
+        k_mocon_steps=kmirr.radians_to_steps(math.radians(kmang))
+
+        if relhum > 0 and pres >0 and celsius > -20 :
+            ambi=Ambient(press=pres, temp=celsius, rhum=relhum)
+        else:
+            ambi=Ambient()
+        obj = astropy.coordinates.SkyCoord(ra=ra, dec=dec,unit="deg")
+        target=Target(obj)
+        # print(target)
+        # import skymakercam # circular import !?! if importet in top section
+        # from skymakercam import SkymakerCamera # circular import !?! if imported in top section
+        # camera=SkymakerCamera(uid=0,camera_system=None)
+        if '70S7C' in flirtyp :
+            pixsize=4.5
+        else:
+            pixsize=9.0
+
+        wcs = self.to_wcs(site, target, None, ambi, k_mocon_steps, ag_cam_name, 
+                genrevx, genrevy, kmirr, time, pixsize,bin=bin,wd=wd,hd=hd)
+        print(wcs)
+        return wcs
 
     def centrTarg(self, site, target, ambi, fib, flen=1839.8, time=None):
         """
