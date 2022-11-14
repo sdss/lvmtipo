@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-11-11
+# @Date: 2022-11-14
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -11,6 +11,7 @@ Python3 class for siderostat field angles using homogeneous coordinates
 
 import math
 import numpy
+import datetime
 import astropy.coordinates
 import astropy.time
 import astropy.units
@@ -393,11 +394,13 @@ class Siderostat():
         wcshdr.append(key)
         key = astropy.io.fits.Card("CTYPE2", "DEC--TAN", "WCS type axis 2")
         wcshdr.append(key)
+
+        hexrep = target.targ.to_string('hmsdms')
         key = astropy.io.fits.Card(
-            "CRVAL1", target.targ.ra.degree, "[deg] RA at reference pixel")
+            "CRVAL1", target.targ.ra.degree, "[deg] RA ref pixel " + hexrep)
         wcshdr.append(key)
         key = astropy.io.fits.Card(
-            "CRVAL2", target.targ.dec.degree, "[deg] Dec at reference pixel")
+            "CRVAL2", target.targ.dec.degree, "[deg] Dec ref pixel " + hexrep)
         wcshdr.append(key)
 
         # convert disgtcamEdgeCtr from mm to micron and then to pixels
@@ -504,6 +507,12 @@ class Siderostat():
             "CD2_2", cosperpix, "[deg/px] WCS matrix diagonal")
         wcshdr.append(key)
 
+        # update DATE
+        fwritetime = datetime.datetime.utcnow()
+        key=astropy.io.fits.Card(
+            "DATE", fwritetime.strftime("%Y-%m-%dT%H:%M:%S"), "[] lvmtipo.Siderostat keys modification")
+        wcshdr.append(key)
+
         return wcshdr
 
     def to_wcs(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
@@ -603,11 +612,34 @@ class Siderostat():
         :param fits_in: existing fits file name on local disks
         :type fits_in: str
         :param fits_in: file name of non-existing FITS file on local disks to be created
-        ..warn.. : creation of the file is note yet implemented
         :type fits_out: str
         :return: a set of astropy WCS keywords computed from the other header keywords.
         :rtype: astropy.wcs.WCS
         ..todo..: should probably put in the __main__ of the fieldrotation sample
+        ..warn.. : There are several hacks in the code to deal with incorrect FITS headers..
+
+        Usage example: (first in bash rm tst[WCE].fits in the shell, then thisprog.py, then
+          ds9 -mosaic tst[WCE].fits)
+        #!/usr/bin/env python3
+
+        from lvmtipo.siderostat import Siderostat
+        import astropy.io.fits
+
+        fits_in="/home/mathar/lvm.sci.agcam.west_00001112.fits"
+        fits_out="tstW.fits"
+        sid=Siderostat()
+
+        sid.update_fits(fits_in,fits_out)
+
+        fits_in="/home/mathar/lvm.sci.agcam.east_00001112.fits"
+        fits_out="tstE.fits"
+        sid=Siderostat()
+        sid.update_fits(fits_in,fits_out)
+
+        fits_in="/home/mathar/lvm.spec.agcam.center_00000731.fits"
+        fits_out="tstC.fits"
+        sid=Siderostat()
+        sid.update_fits(fits_in,fits_out)
         """
 
         # grab header of PHDU of fits_in
@@ -622,18 +654,38 @@ class Siderostat():
         # ra and dec in degrees
         ra = hdr['RA'] 
         dec = hdr['DEC'] 
+        # hack 1: correct the absolutely wrong values of 2022-10-26 for Alcyrone
+        # ra=(3+47.0/60.0+29.19/3600.)*15 ;
+        # dec= 24+6/60.0+14.8/3600. ;
 
         # horizontal and vertical flips in the image
         genrevx = hdr['GENREVX'] 
         genrevy = hdr['GENREVY'] 
         # K-mirror position
-        kmang = -hdr['KMIRDROT'] # the Briegel angles are the opposite of our positian angles
+        # The KMIRDROT uses a convnetion where this is apparently
+        # the mechanical angle with a sign such that -135 indicates the home position.
+        kmang = -hdr['KMIRDROT']
+
+        # hack 2 to correct incorrect early FITS Plejades headers at MPIA
+        # delete the if-block for files after approx Nov 10 2022
+        if abs(kmang) > 990 :
+            kmang = 135
+
         time = hdr['DATE-OBS'] # may be wrong by 35 seconds 
         # binning factor 1,2,4
         bin = hdr['BINX']
         # FLIR camera type (to deduce the pixel size in microns)
         flirtyp = hdr['CAMTYPE']
         ag_cam_name = hdr['CAMNAME'].strip()
+
+        # hack 3 to correct incorrect early FITS headers at MPIA
+        # delete the if-block for files after approx Nov 10 2022
+        if 'center' in ag_cam_name :
+            genrevy=True
+        elif 'east' in ag_cam_name :
+            genrevy=True
+        elif 'west' in ag_cam_name :
+            genrevy=True
 
         # some less important data to build a refractivity model
         celsius = hdr['BENTEMP']
@@ -654,17 +706,29 @@ class Siderostat():
         obj = astropy.coordinates.SkyCoord(ra=ra, dec=dec,unit="deg")
         target=Target(obj)
         # print(target)
-        # import skymakercam # circular import !?! if importet in top section
-        # from skymakercam import SkymakerCamera # circular import !?! if imported in top section
-        # camera=SkymakerCamera(uid=0,camera_system=None)
         if '70S7C' in flirtyp :
             pixsize=4.5
         else:
             pixsize=9.0
 
-        wcs = self.to_wcs(site, target, None, ambi, k_mocon_steps, ag_cam_name, 
+        wcshdr = self.to_header(site, target, None, ambi, k_mocon_steps, ag_cam_name, 
                 genrevx, genrevy, kmirr, time, pixsize,bin=bin,wd=wd,hd=hd)
-        print(wcs)
+        # print(wcshdr)
+
+        # copy the data/image to the new HDU
+        hduout = astropy.io.fits.PrimaryHDU(hdu[0].data)
+
+        # copy also the header.
+        # Need copy() here, otherwise the update() further down will refuse to replace 
+        # the old CD values which are in the old FITS file.
+        hduout.header = hdu[0].header.copy()
+        hduout.header.update(wcshdr,unique=True)
+        # todo: remove/replace CHECKSUM and edit DATE, currently astropy
+        # will (errnously) not refer to UTC in the checksum/datasum headers
+        hduout.writeto(fits_out,checksum=True)
+
+        wcs= astropy.wcs.WCS(hdr)
+        # print(wcs)
         return wcs
 
     def centrTarg(self, site, target, ambi, fib, flen=1839.8, time=None):
