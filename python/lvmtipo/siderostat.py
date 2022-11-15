@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-11-14
+# @Date: 2022-11-15
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -37,18 +37,21 @@ class Siderostat():
     def __init__(self, zenang=90.0, azang=0.0, medSign=-1, m1m2dist=240.0):
         """ A siderostat of 2 mirrors
         :param zenang: Zenith angle of the direction of the exit beam (degrees)
-                   in the range 0..180. Default is the design value of the LCO LVMT.
+                   in the range 0..180. Default is the design value of the LVMT.
         :type zenang: float
+
         :param azang: Azimuth angle of the direction of the exit beam (degrees)
                    in the range -180..360 degrees, N=0, E=90.
                    Ought to be zero for the LCO LVMT where the FP is north of the
                    siderostat and 180 for the MPIA test setup where the FP is
-                   south of the siderostat..
+                   south of the siderostat.. The default is the angle for LCO.
         :type azang: float
+
         :param medSign: Sign of the meridian flip design of the mechanics.
                        Must be either +1 or -1. Default is the LCO LVMT design as build (in newer
                        but not the older documentation).
         :type medSign: int
+
         :param m1m2dist: Distance between the centers of M1 and M2 in millimeter.
                        The default value is taken from
                        LVM-0098_Sky Baffle Design of 2022-04-18
@@ -86,6 +89,34 @@ class Siderostat():
         self.box[1] = -self.b[2]
         self.box[2] = self.b[1]
         self.boy = numpy.cross(self.b, self.box)
+
+#     def parallact(self, site, target, ambi, time):
+#         """
+#         Compute the parallactic angle for that target at that time.
+#         :return: The parallactic angle in radians
+#         :rtype: float
+#         """
+#         #define the zenith in the topocentric horizontal frame
+#         earthloc = site.toEarthLocation()
+#         zeni_hori = astropy.coordinates.AltAz(
+#             location=earthloc,
+#             obstime=time,
+#             pressure=astropy.units.Quantity(
+#                 100.*ambi.press, unit=astropy.units.Pa),
+#             temperature=astropy.units.Quantity(
+#                 ambi.temp, unit=astropy.units.deg_C),
+#             relative_humidity=ambi.rhum,
+#             obswl=astropy.units.Quantity(ambi.wlen, unit=astropy.units.um),
+#             az=astropy.coordinates.Angle(0,unit=astropy.units.degree),
+#             alt=astropy.coordinates.Angle(90,unit=astropy.units.degree))
+# 
+#         # print(zeni_hori)
+#         # project the zenith to the equatorial coordinates
+#         # zeni= zeni_hori.transform_to(frame='icrs')
+#         icrs_frame = astropy.coordinates.ICRS()
+#         zeni= zeni_hori.transform_to(icrs_frame)
+#         pa = target.targ.position_angle(zeni)
+#         return pa.radian
 
     def fieldAngle(self, site, target, ambi, time=None):
         """
@@ -175,14 +206,12 @@ class Siderostat():
         return math.atan2(sin_fang, cos_fang)
 
     def to_header(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
-           genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,flen=1839.8,
-           dist_cam_edge=11.14771):
+           genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,
+           flen=1839.8, dist_cam_edge=11.14771):
         """ Convert the parameters to FITS WCS header cards.
         This traces the position angle implied by the siderostat and number of mirror
         reflections through the K-mirror if applicable and through the
-        prisms if applicable to predict the key WCS keywords. The main difference
-        to the implementation in lvmcam/python/lvmcam/models/wcs.py
-        is that the variable genvrev[xy] are included in this computation.
+        prisms if applicable to predict the key WCS keywords.
         .. warn:: this assumes that the FITS files are read out as
            in the MPIA test setup: all east/west/center cameras with the
            long edge up-down, no rotation by any 90 or 180 degrees in any
@@ -208,8 +237,7 @@ class Siderostat():
              various different conventions are in use for this instrument,
              both with respect to sign and with respect to mechanical vs
              optical angles.
-             For one of the three benches (hidden in ag_cam_name) this is
-             a dummy argument because there is no K-mirror.
+             If kmirr=None this parameter is not used.
         :type k_mocon_steps: int
 
         :param ag_cam_name: The telescope (skye, skyw, spec, sci) and camera
@@ -302,16 +330,16 @@ class Siderostat():
             # ang_out = 2*kangle+-pi - ang_in
             ang = math.pi + 2.*kangle - ang
 
-        tele=''
+        tele='LVMT'
         if ag_cam_name.find('skye') >= 0 :
-            tele='skye'
+           tele +=' skye'
         elif ag_cam_name.find('skyw') >= 0 :
-            tele='skyw'
+            tele +=' skyw'
         elif ag_cam_name.find('sci') >= 0 :
-            tele='sci'
-        else:
-            tele='spec'
-        key = astropy.io.fits.Card("TELESCOP", tele, " sci, skye, skyw, or spec")
+           tele +=' sci'
+        elif ag_cam_name.find('spec') >= 0 :
+           tele +=' spec'
+        key = astropy.io.fits.Card("TELESCOP", tele, "Local Volume Mapper sci, skye, skyw, spec")
         wcshdr.append(key)
 
         if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
@@ -353,7 +381,9 @@ class Siderostat():
             tele += '.agw'
         elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0:
             tele += '.age'
-        key = astropy.io.fits.Card("CAMERA", tele, " AG camera on the bench")
+        else:
+            tele += '.'
+        key = astropy.io.fits.Card("CAMERA", tele, " AG camera age, agw, agc on the bench")
         wcshdr.append(key)
 
         # assign an image parity defined by the even/odd number of mirror reflections
@@ -395,10 +425,12 @@ class Siderostat():
         key = astropy.io.fits.Card("CTYPE2", "DEC--TAN", "WCS type axis 2")
         wcshdr.append(key)
 
-        hexrep = target.targ.to_string('hmsdms')
+        # hexrep = target.targ.to_string('hmsdms')
+        hexrep = target.targ.ra.to_string(unit=astropy.units.hour,precision=2)
         key = astropy.io.fits.Card(
             "CRVAL1", target.targ.ra.degree, "[deg] RA ref pixel " + hexrep)
         wcshdr.append(key)
+        hexrep = target.targ.dec.to_string(unit=astropy.units.degree,precision=2)
         key = astropy.io.fits.Card(
             "CRVAL2", target.targ.dec.degree, "[deg] Dec ref pixel " + hexrep)
         wcshdr.append(key)
@@ -507,10 +539,31 @@ class Siderostat():
             "CD2_2", cosperpix, "[deg/px] WCS matrix diagonal")
         wcshdr.append(key)
 
+        horiz = target.toHoriz(site=site, ambi=ambi, time=now)
+        # print(horiz)
+        # print("alt ", horiz.alt, type(horiz.alt))
+        # print("az ", horiz.az, type(horiz.az))
+        # print("az ", horiz.az.deg)
+        # why does horiz.alt.degrees(), horiz.az.degrees() not work here?
+        # print(horiz.az.radian)
+        # float(horiz.alt.to_string(unit='degree',decimal=True))
+        key=astropy.io.fits.Card(
+            "ALT", horiz.alt.deg, "[deg] object altitude above horizon")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card(
+            "AZ", horiz.az.deg, "[deg] object azimuth N=0, E=90")
+        wcshdr.append(key)
+  
+        # compute the parallactic angle 
+        pa = target.parallact(site, ambi, now)
+        # print(pa, math.degrees(pa))
+        key=astropy.io.fits.Card("PARANG", math.degrees(pa), "[deg] parallactic angle")
+        wcshdr.append(key)
+
         # update DATE
         fwritetime = datetime.datetime.utcnow()
         key=astropy.io.fits.Card(
-            "DATE", fwritetime.strftime("%Y-%m-%dT%H:%M:%S"), "[] lvmtipo.Siderostat keys modification")
+            "DATE", fwritetime.strftime("%Y-%m-%dT%H:%M:%S"), "UTC " + str(type(self)) + " keys modification")
         wcshdr.append(key)
 
         return wcshdr
@@ -540,8 +593,7 @@ class Siderostat():
              various different conventions are in use for this instrument,
              both with respect to sign and with respect to mechanical vs
              optical angles.
-             For one of the three benches (hidden in ag_cam_name) this is
-             a dummy argument because there is no K-mirror.
+             If kmirr=None this argument is not used.
         :type k_mocon_steps: int
 
         :param ag_cam_name: The telescope (skye, skyw, spec, sci) and camera
@@ -587,8 +639,6 @@ class Siderostat():
 
         :param dist_cam_edge: the distance of the long east or west FLIR camera edge to
              the fiber bundle centre in millimeters
-             Is 7.144+4.0 mm according to SDSS-V_0110 figure 6
-             and 11.14471 according to figure 3-1 of LVMi-0081
         :type dist_cam_edge: float
 
         :return: a set of astropy WCS keywords.
@@ -605,18 +655,29 @@ class Siderostat():
         """
         Update the WCS header cards of an existing FITS file with
         computed a-priori parameters  found in the header.
-        This is essentially a tester for existing FITS files so the result can
-          be compared with astrometry.net solutions.
+        The header parameters OBSERVAT, DATE-OBS, GENREV[XY], BINX,
+            KMIRDROT, CAMNAME etc are fed into the computed position angles for
+            the fits_in image (in the primary header), and fits_out
+            is created with the same image but WCS keywords replaced according to the
+            theory of the LVMT mirror trains.
+        This is essentially a checker for existing FITS files so the result can
+          be compared with astrometry.net solutions, and a demonstrator of
+          how first esimators to run astrometry.net  could be found.
+
         ..warn..: this works only assuming that some standard conventions in the
             header data (as applying in Nov 2022) are met.
         :param fits_in: existing fits file name on local disks
         :type fits_in: str
-        :param fits_in: file name of non-existing FITS file on local disks to be created
+
+        :param fits_out: file name of a non-existing FITS file on local disks to be created
+            To prevent creation of the FITS file this can be None, so effectively
+            the returned WCS structure is computed.
         :type fits_out: str
+
         :return: a set of astropy WCS keywords computed from the other header keywords.
         :rtype: astropy.wcs.WCS
+
         ..todo..: should probably put in the __main__ of the fieldrotation sample
-        ..warn.. : There are several hacks in the code to deal with incorrect FITS headers..
 
         Usage example: (first in bash rm tst[WCE].fits in the shell, then thisprog.py, then
           ds9 -mosaic tst[WCE].fits)
@@ -628,7 +689,6 @@ class Siderostat():
         fits_in="/home/mathar/lvm.sci.agcam.west_00001112.fits"
         fits_out="tstW.fits"
         sid=Siderostat()
-
         sid.update_fits(fits_in,fits_out)
 
         fits_in="/home/mathar/lvm.sci.agcam.east_00001112.fits"
@@ -658,27 +718,25 @@ class Siderostat():
         # ra=(3+47.0/60.0+29.19/3600.)*15 ;
         # dec= 24+6/60.0+14.8/3600. ;
 
-        # horizontal and vertical flips in the image
+        # horizontal and vertical avariscam flips in the image
         genrevx = hdr['GENREVX'] 
         genrevy = hdr['GENREVY'] 
-        # K-mirror position
+
+        # K-mirror (middle mirror) position angle in degrees
         # The KMIRDROT uses a convnetion where this is apparently
         # the mechanical angle with a sign such that -135 indicates the home position.
         kmang = -hdr['KMIRDROT']
 
-        # hack 2 to correct incorrect early FITS Plejades headers at MPIA
-        # delete the if-block for files after approx Nov 10 2022
-        if abs(kmang) > 990 :
-            kmang = 135
+        # DATE-OBS is in TAI time scales (37 seconds off UTC)
+        time = astropy.time.Time(hdr['DATE-OBS'],format='isot',scale='tai')
 
-        time = hdr['DATE-OBS'] # may be wrong by 35 seconds 
         # binning factor 1,2,4
         bin = hdr['BINX']
         # FLIR camera type (to deduce the pixel size in microns)
         flirtyp = hdr['CAMTYPE']
         ag_cam_name = hdr['CAMNAME'].strip()
 
-        # hack 3 to correct incorrect early FITS headers at MPIA
+        # hack to correct incorrect early FITS headers at MPIA
         # delete the if-block for files after approx Nov 10 2022
         if 'center' in ag_cam_name :
             genrevy=True
@@ -696,36 +754,66 @@ class Siderostat():
         wd=hdr['NAXIS1']
         hd=hdr['NAXIS2']
 
-        kmirr = Kmirror()
-        k_mocon_steps=kmirr.radians_to_steps(math.radians(kmang))
+        # try to guess a telescope bench from the file name
+        tele=''
+        if 'sci' in fits_in :
+            tele += 'sci'
+        elif 'skyw' in fits_in :
+            tele += 'skyw'
+        elif 'skye' in fits_in :
+            tele += 'skye'
+        elif 'spec' in fits_in :
+            tele += 'spec'
 
-        if relhum > 0 and pres >0 and celsius > -20 :
+        # consistency check: if the telescope is not spec this
+        # value needs to be <= 137 which is a rough estimate for the home switch offset
+        # For the spec telescope there is no k-mirror and this angle does not matter
+        if 'spec' not in tele:
+            if abs(kmang) > 200:
+                # for the sci, skye and skyw we need an angle
+                # but this seems not to be correct here...
+                raise ValueError("unsupported K-mirror angle " + str(kmang) + " on " + tele)
+            else:
+                kmirr = Kmirror()
+                k_mocon_steps=kmirr.radians_to_steps(math.radians(kmang))
+        else:
+            kmirr = None
+            k_mocon_steps=None
+
+
+        if relhum >= 0 and pres >0 and celsius > -20 :
             ambi=Ambient(press=pres, temp=celsius, rhum=relhum)
         else:
             ambi=Ambient()
         obj = astropy.coordinates.SkyCoord(ra=ra, dec=dec,unit="deg")
         target=Target(obj)
         # print(target)
+
+        # Because the arcsecs per pixel kw in the FITS files is usually wrong
+        # for the center camera, we derive our own patched values here....
         if '70S7C' in flirtyp :
             pixsize=4.5
         else:
             pixsize=9.0
 
-        wcshdr = self.to_header(site, target, None, ambi, k_mocon_steps, ag_cam_name, 
-                genrevx, genrevy, kmirr, time, pixsize,bin=bin,wd=wd,hd=hd)
+        wcshdr = self.to_header(site, target, None, ambi, k_mocon_steps, tele + " " + ag_cam_name, 
+                genrevx, genrevy, kmirr, time, pixsize, bin=bin, wd=wd, hd=hd)
         # print(wcshdr)
 
-        # copy the data/image to the new HDU
-        hduout = astropy.io.fits.PrimaryHDU(hdu[0].data)
-
-        # copy also the header.
-        # Need copy() here, otherwise the update() further down will refuse to replace 
-        # the old CD values which are in the old FITS file.
-        hduout.header = hdu[0].header.copy()
-        hduout.header.update(wcshdr,unique=True)
-        # todo: remove/replace CHECKSUM and edit DATE, currently astropy
-        # will (errnously) not refer to UTC in the checksum/datasum headers
-        hduout.writeto(fits_out,checksum=True)
+        if fits_out is not None :
+            # In this case we want to create a new not yet existing FITS file
+            # copy the data/image to a new HDU
+            hduout = astropy.io.fits.PrimaryHDU(hdu[0].data)
+    
+            # copy also the header.
+            # Need copy() here, otherwise the update() further down will refuse to replace 
+            # the old CD values which are in the old FITS file.
+            hduout.header = hdu[0].header.copy()
+            hduout.header.update(wcshdr,unique=True)
+            # todo: remove/replace CHECKSUM and edit DATE, currently astropy
+            # will (errnously) not refer to UTC in the checksum/datasum headers
+            # but to the local timezone of the computer
+            hduout.writeto(fits_out,checksum=True)
 
         wcs= astropy.wcs.WCS(hdr)
         # print(wcs)

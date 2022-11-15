@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2021-11-21
+# @Date: 2022-11-15
 # @Filename: target.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -25,8 +25,8 @@ class Target():
 
     def __init__(self, targ):
         """ target coordinates
-        :param targ Position in equatorial coordinates
-        :type targ astropy.coordinates.Skycoord
+        :param targ: Position in equatorial coordinates
+        :type targ: astropy.coordinates.Skycoord
         """
 
         if isinstance(targ, astropy.coordinates.SkyCoord):
@@ -38,16 +38,16 @@ class Target():
     def toHoriz(self, site, ambi=None, time=None):
         """ convert from equatorial to horizontal coordinates
         :param site: Observatory location
-        :type site: fieldrotation.Site
+        :type site: lvmtipo.Site
 
         :param ambi: Ambient parameters used for refraction correction
-        :type ambi: fieldrotation.Ambient
+        :type ambi: lvmtipo.Ambient
 
         :param time: time of the observation
         :type time: astropy.time.Time
 
         :return: alt-az coordinates
-        :return type astropy.coordinates.AltAz
+        :rtype: type astropy.coordinates.AltAz
         """
         if isinstance(time, astropy.time.Time):
             now = time
@@ -95,3 +95,39 @@ class Target():
             horiz = self.targ.transform_to(altaz)
 
         return horiz
+
+    def parallact(self, site, ambi, time):
+        """
+        Compute the parallactic angle for that target at that time.
+        :param site: geotrphic location of the observatory
+        :type site: lvmtipo.Site
+
+        :param ambi: Ambient parameters used for refraction correction
+        :type ambi: lvmtipo.Ambient
+
+        :param time: time of the observation
+        :type time: astropy.time.Time
+
+        :return: The parallactic angle in radians
+        :rtype: float
+        """
+        #define the zenith in the topocentric horizontal frame (alt,az)=(90,0)
+        earthloc = site.toEarthLocation()
+        zeni_hori = astropy.coordinates.AltAz(
+            location=earthloc,
+            obstime=time,
+            pressure=astropy.units.Quantity(
+                100.*ambi.press, unit=astropy.units.Pa),
+            temperature=astropy.units.Quantity(
+                ambi.temp, unit=astropy.units.deg_C),
+            relative_humidity=ambi.rhum,
+            obswl=astropy.units.Quantity(ambi.wlen, unit=astropy.units.um),
+            az=astropy.coordinates.Angle(0,unit=astropy.units.degree),
+            alt=astropy.coordinates.Angle(90,unit=astropy.units.degree))
+
+        icrs_frame = astropy.coordinates.ICRS()
+        # convert the zenith back to the ra/dec equatorial frame
+        zeni= zeni_hori.transform_to(icrs_frame)
+        # and the parallactic angle is the position angle of the zenith, coordinates.Angle
+        pa = self.targ.position_angle(zeni)
+        return pa.radian
