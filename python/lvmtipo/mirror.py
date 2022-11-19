@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2021-11-21
+# @Date: 2022-11-18
 # @Filename: mirror.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -27,14 +27,14 @@ class Mirror():
 
     def __init__(self, normal, disttoorg):
         """
-        :param normal The 3 Cartesian coordinates of the surface normal.
+        :param normal: The 3 Cartesian coordinates of the surface normal.
                It must have nonzero length, but
                does not need to be normalized to unit length.
-        :type numpy.ndarray with 3 (xyz) numbers
-        :param disttoorg The distance of the mirror to the origin of coordinates
+        :type normal: numpy.ndarray with 3 (xyz) numbers
+        :param disttoorg: The distance of the mirror to the origin of coordinates
                As in usual geometry, the distance is the shortest distance of the origin
                to the infinitely extended mirror plane.
-        :type float
+        :type disttoorg: float
         """
         if isinstance(normal, numpy.ndarray) and isinstance(disttoorg, (int,float)) :
             self.d = float(disttoorg)
@@ -49,7 +49,7 @@ class Mirror():
 
     def toHomTrans(self) :
         """
-        :return The homogeneous transformation that represents
+        :return: The homogeneous transformation that represents
               the reflection of rays off this mirror surface.
         """
         matr = numpy.zeros((4,4))

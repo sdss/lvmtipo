@@ -30,10 +30,10 @@ class HomTrans():
 
     def multiply(self, rhs):
         """
-        :param rhs The transformation to the right of the multiplication
+        :param rhs: The transformation to the right of the multiplication
                    sign. So rhs is applied before this transformation.
-        :type HomTrans
-        :return The homogeneous transformation which is the (non-communtative)
+        :type rhs: HomTrans
+        :return: The homogeneous transformation which is the (non-communtative)
                 product of self with rhs, representing the consecutive
                 application of rhs, then self.
         """
@@ -48,10 +48,10 @@ class HomTrans():
     def apply(self, rhs):
         """
         Apply self transformation to a vector of coordinates.
-        :param rhs The vector. If it has only the standard 3 coordinates,
+        :param rhs: The vector. If it has only the standard 3 coordinates,
                    a virtual 1 is appended before applying the transformation.
-        :type numpy.ndarray of dimension 1
-        :return a numpy.ndarray with a vector of 3 (standard, projected) Cartesian coordinates.
+        :type rhs: numpy.ndarray of dimension 1
+        :return: a numpy.ndarray with a vector of 3 (standard, projected) Cartesian coordinates.
         """
         if isinstance(rhs, numpy.ndarray) :
             if rhs.ndim == 1 :

@@ -37,7 +37,7 @@ class Siderostat():
     def __init__(self, zenang=90.0, azang=0.0, medSign=-1, m1m2dist=240.0):
         """ A siderostat of 2 mirrors
         :param zenang: Zenith angle of the direction of the exit beam (degrees)
-                   in the range 0..180. Default is the design value of the LVMT.
+                   in the range 0..180. Default is the design value of the LVMT: horizontal
         :type zenang: float
 
         :param azang: Azimuth angle of the direction of the exit beam (degrees)
@@ -83,40 +83,13 @@ class Siderostat():
         else:
             raise TypeError("invalid medSign data type")
 
-        # axes orthogonal to beam
+        # axes orthogonal to beam. box points essentially to the zenith
+        # and boy essentially to the East (at LCO) resp West (at MPIA)
         self.box = numpy.zeros((3))
         self.box[0] = 0.0
         self.box[1] = -self.b[2]
         self.box[2] = self.b[1]
         self.boy = numpy.cross(self.b, self.box)
-
-#     def parallact(self, site, target, ambi, time):
-#         """
-#         Compute the parallactic angle for that target at that time.
-#         :return: The parallactic angle in radians
-#         :rtype: float
-#         """
-#         #define the zenith in the topocentric horizontal frame
-#         earthloc = site.toEarthLocation()
-#         zeni_hori = astropy.coordinates.AltAz(
-#             location=earthloc,
-#             obstime=time,
-#             pressure=astropy.units.Quantity(
-#                 100.*ambi.press, unit=astropy.units.Pa),
-#             temperature=astropy.units.Quantity(
-#                 ambi.temp, unit=astropy.units.deg_C),
-#             relative_humidity=ambi.rhum,
-#             obswl=astropy.units.Quantity(ambi.wlen, unit=astropy.units.um),
-#             az=astropy.coordinates.Angle(0,unit=astropy.units.degree),
-#             alt=astropy.coordinates.Angle(90,unit=astropy.units.degree))
-# 
-#         # print(zeni_hori)
-#         # project the zenith to the equatorial coordinates
-#         # zeni= zeni_hori.transform_to(frame='icrs')
-#         icrs_frame = astropy.coordinates.ICRS()
-#         zeni= zeni_hori.transform_to(icrs_frame)
-#         pa = target.targ.position_angle(zeni)
-#         return pa.radian
 
     def fieldAngle(self, site, target, ambi, time=None):
         """
@@ -153,23 +126,30 @@ class Siderostat():
         star[2] = math.sin(horiz.alt.radian)
 
         # unit vector from M2 to M1
+        # we're not normalizing to self.m1m2len but keeping the vector
+        # m2tom1 at length 1 to simplify the later subtractions to compute
+        # normal vectors from other unit vector
         m2tom1 = numpy.cross(star, self.b)
         vlen = numpy.linalg.norm(m2tom1)
         m2tom1 /= self.sign*vlen
 
-        # surface normal to M1
+        # surface normal to M1 (not normalized to 1)
         m1norm = star - m2tom1
+        # the orthogonal distance of the points of M1 to the origin
+        # of coordinates are implied by the m1norm direction and
+        # the fact that m2tom1 is on the surface. So the homogeneous
+        # coordinate equation applied to m2tom1 should yield m2tom1 itself.
+        # This requires (m2tom1 . m1norm -d) * n1morm=0 where dots are dot products.
+        # the latter dot product actually requires a normalized m1norm
         vlen = numpy.linalg.norm(m1norm)
         m1norm /= vlen
-        m1 = Mirror(m1norm, 1.0)
+        m1 = Mirror(m1norm, numpy.dot(m2tom1,m1norm))
 
-        # surface normal to M2
+        # surface normal to M2 (not normalized to 1)
         m2norm = self.b + m2tom1
-        vlen = numpy.linalg.norm(m2norm)
-        m2norm /= vlen
         m2 = Mirror(m2norm, 0.0)
 
-        # transformation matrix for the 2 reflections
+        # transformation matrix for the 2 reflections individually and in series
         m1trans = m1.toHomTrans()
         m2trans = m2.toHomTrans()
         trans = m2trans.multiply(m1trans)
@@ -179,11 +159,19 @@ class Siderostat():
 	# 10 arcmin = 0.16 deg further to NCP
         targNcp = Target(target.targ.spherical_offsets_by(
                        astropy.coordinates.Angle("0deg"), astropy.coordinates.Angle("0.16deg")))
+
+        # this here is the equivalent code to track a target with RA +0.16eg
+        #    targNcp = Target(target.targ.spherical_offsets_by(
+        #               astropy.coordinates.Angle("0.16deg"), astropy.coordinates.Angle("0deg")))
+        # print("targNcp", to_north, targNcp.targ)
+        # at this point using a positive value of the first paramter (0.16deg) gives
+        # a target with larger RA value.
+        # has 
         horizNcp = targNcp.toHoriz(site=site, ambi=ambi, time=now)
 
         starNcp = numpy.zeros((3))
         # same procedure as in the construction of b in the Sider ctor,
-        # but with 90-zenith angle=altitude
+        # but with 90 minus zenith angle=altitude
         starNcp[0] = math.sin(horizNcp.az.radian) * \
                               math.cos(horizNcp.alt.radian)
         starNcp[1] = math.cos(horizNcp.az.radian) * \
@@ -192,13 +180,17 @@ class Siderostat():
 
         # image of targNcp while hitting M1
         m1img = trans.apply(m2tom1)
+
         # image of targNcp before arriving at M1
         star_off_m1 = m2tom1 + starNcp
+
         starimg = trans.apply(star_off_m1)
 
         # virtual direction of ray as seen from point after M2
         # no need to normalize this because the atan2 will do...
-        starvirt = m1img - starimg
+        # sign was wrong until 2022-11-19: we need to take the direction
+        # from the on-axis star (m1img) to the off-axis start (starimg).
+        starvirt = starimg - m1img
 
         # project in a plane orthogonal to  self.b
         cos_fang = numpy.dot(starvirt, self.box)
@@ -207,7 +199,7 @@ class Siderostat():
 
     def to_header(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
            genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,
-           flen=1839.8, dist_cam_edge=11.14771):
+           flen=1839.8, dist_cam_edge=11.14771, swap_ew_cams = True):
         """ Convert the parameters to FITS WCS header cards.
         This traces the position angle implied by the siderostat and number of mirror
         reflections through the K-mirror if applicable and through the
@@ -287,15 +279,22 @@ class Siderostat():
              and 11.14471 according to figure 3-1 of LVMi-0081
         :type dist_cam_edge: float
 
+        :param swap_ew_cams: if true, consider the serial data streams received by the age and 
+             the agw swapped/exchanged.
+             This occurs if the IP addresses (in configuration and static dhcp)
+             are wrong so the 16-bit-byte-streams of the east camera appear here
+             as the west camera and vice versa.
+        :type swap_ew_cams: bool
+
         :return a set of FITS header cards with WCS keywords.
         :rtype astropy.io.fits.Header
         """
 
-        # start with set of header cards of geographics of the observatory
+        # start with header cards of geographic coords of the observatory
         wcshdr = site.to_header()
 
-        # compute the position angle (NCP) after the siderostat
-        # (before the K-mirror) in radians.
+        # compute the position angle (NCP) after the siderostat,
+        # before the K-mirror, in radians.
         if isinstance(time, astropy.time.Time):
             now = time
         elif isinstance(time, str):
@@ -303,8 +302,16 @@ class Siderostat():
         elif time is None:
             now = astropy.time.Time.now()
         ang = self.fieldAngle(site, target, ambi, time=now)
+        # angtmp = self.fieldAngle(site, target, ambi, time=now,to_north=False)
 
-        # number of mirror reflections so far (2 of the siderostat)
+        # at this point (after M2) the angular value for E targets
+        # is 90 deg larger, ie. they are right from the targets for N targets
+        # so the image is flipped, whch reflects that a lens flips images
+        # not actually the lens but the act of turning around to look at the
+        # picture on some downstream detector.
+        # print("now",now,"ang N",math.degrees(ang),"deg")
+
+        # number of mirror reflections so far, 2 of the siderostat
         n_refl = 2
 
         # Simplify the interface by also recognizing the descr of
@@ -312,16 +319,20 @@ class Siderostat():
         ag_cam_name = ag_cam_name.lower()
 
         # three LVMT benches have a K-mirror, one has not
+        # Calculate the position angle after (any) K-mirror
         if kmirr is None:
-            # this will eventually be the case of the spec-telescope
+            # this will be the case of the spec-telescope at LCO
+            # This may be wrong for some MPIA setups
             # the angle passes unchanged
             pass
         else:
-            # this will eventually be the case of the sci, skye, skyw telescopes
+            # this will eventually be the case of the sci, skye, skyw telescopes at LCO
+            # This may be wrong for some MPIA setups
             n_refl += 3
 
             # convert K-mirror orientation to radians
             kangle = kmirr.steps_to_radians(k_mocon_steps)
+            # print("kmirr ",math.degrees(kangle))
 
             # flip the component of the position angle in the incidence
             # plane(s) of the K-mirror. So kangle+-90 deg is the
@@ -329,7 +340,12 @@ class Siderostat():
             # (ang_in+ang_out)/2 = kangle+-pi/2
             # ang_out = 2*kangle+-pi - ang_in
             ang = math.pi + 2.*kangle - ang
+            # angtmp = math.pi + 2.*kangle - angtmp
 
+        # at this point (after K-mirror) the angular value for E targets
+        # is 90 deg smaller, ie. they are left from the targets for N targets.
+        # print("after kmirr",math.degrees(ang)," N deg")
+        # print("after kmirr",math.degrees(angtmp)," E deg")
         tele='LVMT'
         if ag_cam_name.find('skye') >= 0 :
            tele +=' skye'
@@ -342,16 +358,42 @@ class Siderostat():
         key = astropy.io.fits.Card("TELESCOP", tele, "Local Volume Mapper sci, skye, skyw, spec")
         wcshdr.append(key)
 
-        if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
-            # no prism
-            # assume camera is mounted vertically with the long lower edge
-            # pointing east ( basically rotating the east camera 90 deg
-            # around the vertical axis and then 180 deg around the horizontal axis.
-            # We want to express an angle where the reference is "up" to an
-            # angle where the reference "left" or "to the west"
-            # (passive rotation)
-            ang += math.pi/2.0
-        elif ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
+        # print(tele)
+
+        is_agw = is_age = is_agc = False
+        if ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
+            if swap_ew_cams:
+               is_age=True
+            else :
+               is_agw=True
+        elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0:
+            if swap_ew_cams:
+               is_agw=True
+            else :
+               is_age=True
+        elif ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
+               # this is last in the elif-chain because the name may have the substring 'agcam...'
+               is_agc=True
+        else:
+            raise NameError("Unrecognized camera name " + ag_cam_name)
+
+        # since the camera has already performed internally one
+        # flip around the long axis assuming there is a single lens
+        # and that the output stream should be in scan raster format we start
+        # with flipCDy=true, which means the camera reads the pixels (assuming
+        # the PoE connector is at the bottom) from bottom row to top row, left to right.
+        # Note that almost always digrevy=true later on, such that we actully
+        # may have read this top to bottom. flipCDy is relative to the scan raster format.
+        flipCDy=True
+        flipCDx=False
+
+        # next recalculate the position angle passing by a prism
+        # (if there is any) and recalculating it in the
+        # camera orientations. Th ecamera orientations are all
+        # with the long edge vertical. The new angles are those
+        # where x is along the long edge and y is positive if pointing
+        # away from the long side with the PoE connector.
+        if is_agw :
             # prism incidence plane is horizontal. Flip that component
             ang *= -1.0
             n_refl += 1
@@ -361,7 +403,7 @@ class Siderostat():
             # angle where the reference "right" or geographicall "to the north"
             # (passive rotation)
             ang -= math.pi/2.0
-        elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0:
+        elif is_age :
             # prism incidence plane is horizontal. Flip that component
             ang *= -1.0
             n_refl += 1
@@ -373,21 +415,26 @@ class Siderostat():
             # (passive rotation)
             ang += math.pi/2.0
         else:
-            raise NameError("Unrecognized camera name " + ag_cam_name)
+            # center camera no prism
+            # assume camera is mounted vertically with the long lower edge
+            # pointing east ( basically rotating the east camera 90 deg
+            # around the vertical axis and then 180 deg around the horizontal axis.
+            # We want to express an angle where the reference is "up" to an
+            # angle where the reference "left" or "to the west"
+            # (passive rotation)
+            ang += math.pi/2.0
 
-        if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
+        if is_agc :
             tele += '.agc'
-        elif ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
+        elif is_agw :
             tele += '.agw'
-        elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0:
+        elif is_age :
             tele += '.age'
         else:
             tele += '.'
         key = astropy.io.fits.Card("CAMERA", tele, " AG camera age, agw, agc on the bench")
         wcshdr.append(key)
-
-        # assign an image parity defined by the even/odd number of mirror reflections
-        imgparity = True if ( (n_refl % 2) == 0 ) else False
+        # print(tele,"on chip",math.degrees(ang),"deg")
 
         # up to here ang is refering to the short-edge-up orientation
         # of the camera if that were read out by streaming the araviscam
@@ -395,25 +442,28 @@ class Siderostat():
         # one flip up-down (first row becomes last row) to flush the stream
         # into the standard FITS order where the lowest row is the first to be
         # read, the optically relevant value for that flip is opposite to the
-        # nominal value used for the araviscam itnerface
-        genrevy = not genrevy
+        # nominal value used with the araviscam interface
 
-        # we're left with 4 combinations of genrev[xy]
+        # we're left with 4 combinations of genrev[xy] individually true or false
         if genrevx:
             if genrevy:
                 # both flipped (i.e., a 180 deg rotation)
-                ang += math.pi
+                # ang += math.pi
+                flipCDx = not flipCDx
+                flipCDy = not flipCDy
             else:
-                # x flipped
-                ang = -ang
-                imgparity = not imgparity
+                # x flipped, y not flipped
+                # ang = -ang
+                flipCDx = not flipCDx
         else:
             if genrevy:
                 # x not flipped but y flipped
                 # Note that this is the operation as above for the kmirror at angle 0
                 # a y-flip is the same as an x-flip plus a 180 deg rotation
-                ang = math.pi - ang
-                imgparity = not imgparity
+                # ang = math.pi - ang
+                flipCDy = not flipCDy
+        # print(tele,"with flips",math.degrees(ang),"deg")
+        # print(tele,"flipCDx",flipCDx,"flipCDy",flipCDy)
 
         # add the main pointing keywords
         key = astropy.io.fits.Card("CUNIT1", "deg", "WCS units along axis 1")
@@ -445,6 +495,7 @@ class Siderostat():
 
         # distance from the middle of the east or west camera to fiber ctner in pixels
         if camera is None:
+            # note that hd is already in binned pixels (as in the FITS NAXIS)
             dist_cam_mid = hd / 2 + dist_cam_edge
         else:
             dist_cam_mid = camera.detector_size.hd / \
@@ -461,29 +512,29 @@ class Siderostat():
             crpix1 = camera.detector_size.wd / 2 / camera.binning[0] + 0.5
             crpix2 = camera.detector_size.hd / 2 / camera.binning[1] + 0.5
     
-        if ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0 :
+        if is_agc :
             # ra/dec in the center of the image
             pass
-        elif ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0 :
+        elif is_agw :
             # the direction from the prism center to the fiber center
             # is walkign east, which is in the camera walking to the lower edge
-            if genrevy:
-                crpix2 += dist_cam_mid
-            else:
+            # in raster scan order (flipCDy=false) this means increasing pixy
+            if flipCDy:
                 crpix2 -= dist_cam_mid
-        elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0 :
+            else:
+                crpix2 += dist_cam_mid
+        elif is_age :
             # the direction from the prism center to the fiber center
             # is walkign west, which is in the camera walking to the lower edge
-            if genrevy:
-                crpix2 += dist_cam_mid
-            else:
+            # in raster scan order (flipCDy=false) this means increasing pixy
+            if flipCDy:
                 crpix2 -= dist_cam_mid
+            else:
+                crpix2 += dist_cam_mid
 
-        key=astropy.io.fits.Card(
-            "CRPIX1", crpix1, "[px] point cntr along axis 1")
+        key=astropy.io.fits.Card( "CRPIX1", crpix1, "[px] point cntr along axis 1")
         wcshdr.append(key)
-        key=astropy.io.fits.Card(
-            "CRPIX2", crpix2, "[px] point cntr along axis 2")
+        key=astropy.io.fits.Card( "CRPIX2", crpix2, "[px] point cntr along axis 2")
         wcshdr.append(key)
 
         # the two main values in the CD matrix, irrespective of sign
@@ -513,40 +564,43 @@ class Siderostat():
         #       =
         # ( delta)     ( sin ang, cos ang  ) (y)
 
-        # negative CD determinant for uprigt images (imgparity=True), because
+        xy_to_ad=[[-cosperpix,sinperpix],[sinperpix,cosperpix]]
+        if flipCDx :
+            # direction of x pixels flipped
+            xy_to_ad[0][0] *= -1 
+            xy_to_ad[1][0] *= -1 
+        if flipCDy :
+            # direction of y pixels flipped
+            xy_to_ad[0][1] *= -1 
+            xy_to_ad[1][1] *= -1 
+
+        # negative CD determinant for upright images (imgparity=True), because
         # (ra/dec) are a left-handed coordinate system; positive for flipped (imparity=False)
-        if imgparity:
-            key=astropy.io.fits.Card(
-                "CD1_1", -cosperpix, "[deg/px] WCS matrix diagonal")
-            wcshdr.append(key)
-            key=astropy.io.fits.Card(
-                "CD1_2", sinperpix, "[deg/px] WCS matrix outer diagonal")
-            wcshdr.append(key)
-        else:
-            # in this case the alpha coordinate values are in the opposite direction
-            # so CD1_1 and CD1_2 are negated compared to above
-            key=astropy.io.fits.Card(
-                "CD1_1", cosperpix, "[deg/px] WCS matrix diagonal")
-            wcshdr.append(key)
-            key=astropy.io.fits.Card(
-                "CD1_2", -sinperpix, "[deg/px] WCS matrix outer diagonal")
-            wcshdr.append(key)
 
-        key=astropy.io.fits.Card(
-            "CD2_1", sinperpix, "[deg/px] WCS matrix outer diagonal")
+        # Assign an image parity defined by the even/odd number of mirror reflections
+        # this is the parity one expects in the FITS image, irrespective
+        # of whether readout serialization has changed directions with genrev[xy].
+        imgparity = True if ( (n_refl % 2) == 0 ) else False
+        # ... and there is the lens which also flips once, but the FLIR has
+        # already taken this into account by permuting the pixels in the byte stream.
+        # imgparity = True if ( (n_refl % 2) != 0 ) else False
+
+        if not imgparity:
+            # direction of alpha (i.e. the image) is flipped
+            xy_to_ad[0][0] *= -1 
+            xy_to_ad[0][1] *= -1 
+
+        key=astropy.io.fits.Card( "CD1_1", xy_to_ad[0][0], "[deg/px] WCS matrix diagonal x->ra")
         wcshdr.append(key)
-        key=astropy.io.fits.Card(
-            "CD2_2", cosperpix, "[deg/px] WCS matrix diagonal")
+        key=astropy.io.fits.Card( "CD1_2", xy_to_ad[0][1], "[deg/px] WCS matrix outer diagonal y->ra")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD2_1", xy_to_ad[1][0], "[deg/px] WCS matrix outer diagonal x->delta")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD2_2", xy_to_ad[1][1], "[deg/px] WCS matrix diagonal y-> delta")
         wcshdr.append(key)
 
+        # convert the equatorial to horizontal coordinates
         horiz = target.toHoriz(site=site, ambi=ambi, time=now)
-        # print(horiz)
-        # print("alt ", horiz.alt, type(horiz.alt))
-        # print("az ", horiz.az, type(horiz.az))
-        # print("az ", horiz.az.deg)
-        # why does horiz.alt.degrees(), horiz.az.degrees() not work here?
-        # print(horiz.az.radian)
-        # float(horiz.alt.to_string(unit='degree',decimal=True))
         key=astropy.io.fits.Card(
             "ALT", horiz.alt.deg, "[deg] object altitude above horizon")
         wcshdr.append(key)
@@ -556,7 +610,6 @@ class Siderostat():
   
         # compute the parallactic angle 
         pa = target.parallact(site, ambi, now)
-        # print(pa, math.degrees(pa))
         key=astropy.io.fits.Card("PARANG", math.degrees(pa), "[deg] parallactic angle")
         wcshdr.append(key)
 
@@ -728,22 +781,21 @@ class Siderostat():
         kmang = -hdr['KMIRDROT']
 
         # DATE-OBS is in TAI time scales (37 seconds off UTC)
-        time = astropy.time.Time(hdr['DATE-OBS'],format='isot',scale='tai')
+        time = astropy.time.Time(hdr['DATE-OBS'],format='isot',scale='utc')
+
+        # patch error in FITS headers before 2022-10-30.
+        # This block of code should be removed to increase efficiency at some time in the future
+        patchTime1 = astropy.time.Time('2022-10-30T00:00:00',format='isot',scale='tai')
+        # positive if patched/corrected, i.e., after patchTime2
+        sinceTime1 = time - patchTime1
+        if sinceTime1.to_value('jd') < 0:
+            genrevy = True
 
         # binning factor 1,2,4
         bin = hdr['BINX']
         # FLIR camera type (to deduce the pixel size in microns)
         flirtyp = hdr['CAMTYPE']
         ag_cam_name = hdr['CAMNAME'].strip()
-
-        # hack to correct incorrect early FITS headers at MPIA
-        # delete the if-block for files after approx Nov 10 2022
-        if 'center' in ag_cam_name :
-            genrevy=True
-        elif 'east' in ag_cam_name :
-            genrevy=True
-        elif 'west' in ag_cam_name :
-            genrevy=True
 
         # some less important data to build a refractivity model
         celsius = hdr['BENTEMP']
@@ -769,7 +821,7 @@ class Siderostat():
         # value needs to be <= 137 which is a rough estimate for the home switch offset
         # For the spec telescope there is no k-mirror and this angle does not matter
         if 'spec' not in tele:
-            if abs(kmang) > 200:
+            if abs(kmang) > 140:
                 # for the sci, skye and skyw we need an angle
                 # but this seems not to be correct here...
                 raise ValueError("unsupported K-mirror angle " + str(kmang) + " on " + tele)
@@ -898,7 +950,7 @@ class Siderostat():
 
         return targ_ctr
 
-    def mpiaMocon(self, site, target, ambi, degNCP=0.0, deltaTime=45.0, polyN=20,
+    def mpiaMocon(self, site, target, ambi, degNCP=22.5, deltaTime=45.0, polyN=20,
                   time=None, stepsAtStart=135*180*100,
                   homeIsWest=False, homeOffset=135.0, stepsPerturn=360*180*100):
         """
@@ -923,7 +975,7 @@ class Siderostat():
               the value +90 means the +delta direction is right (horizontally E)
               If this is a fiber, the direction from the center of the fiber bundle
               to that fiber is implied.
-        :type degNCP: float
+        :type degNCP: float or lvmtipo.Fiber
 
         :param deltaTime: Time covered by a single polynomial in seconds
           The default is 45 seconds, which is small enough to keep
