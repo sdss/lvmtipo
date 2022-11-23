@@ -46,7 +46,7 @@ class Wcsarith():
         """
         # super(Wcsarith,self).__init__(*args) # why does this not work?? 'HDUList' object has no attribute 'keys'
         # super(Wcsarith,self).__init__(header=wcs.to_fits())
-        self.wcs = wcs.deepcopy()
+        self.wcs = wcs
 
     def offset_px_to_azalt(self, old_x, old_y, new_x, new_y, site, ambi=None, time=None):
         """
