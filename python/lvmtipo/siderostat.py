@@ -17,8 +17,6 @@ import astropy.time
 import astropy.units
 import astropy.io.fits
 import astropy.wcs
-# import skymakercam # circular import !?!
-# from skymakercam import SkymakerCam
 
 from lvmtipo.mirror import Mirror
 from lvmtipo.target import Target
