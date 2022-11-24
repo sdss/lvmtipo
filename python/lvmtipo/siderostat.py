@@ -959,7 +959,7 @@ class Siderostat():
 
         return targ_ctr
 
-    def mpiaMocon(self, site, target, ambi, degNCP=22.5, deltaTime=45.0, polyN=20,
+    def mpiaMocon(self, site, target, ambi, degNCP=0.0, deltaTime=45.0, polyN=20,
                   time=None, stepsAtStart=135*180*100,
                   homeIsWest=False, homeOffset=135.0, stepsPerturn=360*180*100):
         """
