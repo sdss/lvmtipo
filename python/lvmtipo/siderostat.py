@@ -30,6 +30,7 @@ __all__ = ['Siderostat']
 
 class Siderostat():
     """ A siderostat of 2 mirrors
+    ..todo.. add the roll angle as the 3rd angle besides azang and zenang
     """
 
     def __init__(self, zenang=90.0, azang=0.0, medSign=-1, m1m2dist=240.0):
@@ -196,8 +197,8 @@ class Siderostat():
         return math.atan2(sin_fang, cos_fang)
 
     def to_header(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
-           genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,
-           flen=1839.8, dist_cam_edge=11.14771, swap_ew_cams = True):
+           genrevx, genrevy, kmirr, time=None, pixsize=None, bin=None, wd=None, hd=None,
+           flen=1839.8, dist_cam_edge=11.14771) :
         """ Convert the parameters to FITS WCS header cards.
         This traces the position angle implied by the siderostat and number of mirror
         reflections through the K-mirror if applicable and through the
@@ -257,10 +258,14 @@ class Siderostat():
 
         :param wd: width of the image in pixels (after binning)
               Can be None if camera has this information
+              This is typically 1600 for the monochrome cameras and 3200 for 
+              the color camera (binning=1).
         :type wd: int
 
         :param hd: height of the image in pixels (after binning)
               Can be None if camera has this information
+              This is typically 1100 for the monochrome cameras and 2200 for 
+              the color camera (binning=1).
         :type hd: int
 
         :param flen: focal lens of lens in mm.
@@ -276,13 +281,6 @@ class Siderostat():
              Is 7.144+4.0 mm according to SDSS-V_0110 figure 6
              and 11.14471 according to figure 3-1 of LVMi-0081
         :type dist_cam_edge: float
-
-        :param swap_ew_cams: if true, consider the serial data streams received by the age and 
-             the agw swapped/exchanged.
-             This occurs if the IP addresses (in configuration and static dhcp)
-             are wrong so the 16-bit-byte-streams of the east camera appear here
-             as the west camera and vice versa.
-        :type swap_ew_cams: bool
 
         :return a set of FITS header cards with WCS keywords.
         :rtype astropy.io.fits.Header
@@ -357,6 +355,20 @@ class Siderostat():
         wcshdr.append(key)
 
         # print(tele)
+        # patch error in camera names (S/N assignments )before 2022-11-20.
+        # This block of code should be removed to increase efficiency at some time in the future
+        patchTime2 = astropy.time.Time('2022-11-20T00:00:00',format='isot',scale='tai')
+        # positive if patched/corrected, i.e., after patchTime2
+        sinceTime2 = time - patchTime2
+        if sinceTime2.to_value('jd') < 0:
+            # in the early configuration files the data streams of the east
+            # and west cameras at MPIA were wrong/swapped
+            # This occurs if the IP addresses (in configuration and static dhcp)
+            # are wrong so the 16-bit-byte-streams of the east camera appear here
+            # as the west camera and vice versa.
+            swap_ew_cams = True
+        else:
+            swap_ew_cams = False
 
         is_agw = is_age = is_agc = False
         if ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
@@ -473,7 +485,6 @@ class Siderostat():
         key = astropy.io.fits.Card("CTYPE2", "DEC--TAN", "WCS type axis 2")
         wcshdr.append(key)
 
-        # hexrep = target.targ.to_string('hmsdms')
         hexrep = target.targ.ra.to_string(unit=astropy.units.hour,precision=2)
         key = astropy.io.fits.Card(
             "CRVAL1", target.targ.ra.degree, "[deg] RA ref pixel " + hexrep)

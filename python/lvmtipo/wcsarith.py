@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-11-23
+# @Date: 2022-11-24
 # @Filename: wcsarith.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -40,12 +40,9 @@ class Wcsarith():
     >>> print(offs)
     """
 
-    # def __init__(self, *args): # why does this not work?? 'HDUList' object has no attribute 'keys'
     def __init__(self,wcs):
         """ A sub-class of the WCS astropy mappers.
         """
-        # super(Wcsarith,self).__init__(*args) # why does this not work?? 'HDUList' object has no attribute 'keys'
-        # super(Wcsarith,self).__init__(header=wcs.to_fits())
         self.wcs = wcs
 
     def offset_px_to_azalt(self, old_x, old_y, new_x, new_y, site, ambi=None, time=None):
@@ -54,6 +51,8 @@ class Wcsarith():
         in a FITS coordinate system,
         compute the associated change of the reference pointing coordinate in
         azimuth and alitude of the horizontal coordinate system.
+        This answers the question: if an object is at some (old_x,old_y) coordinate system,
+        which offset is needed so it will appear at (new_x,new_y) after sending the offset?
 
         :param old_x: pixel first coordinate in FITS conventions
         :type old_x: int or float
@@ -114,30 +113,50 @@ class Wcsarith():
 
         # to be checked: is this the subtraction with the correct sign/order???
         # or does the PW mount want the opposite signs??
-        # difference new minus old altitude
-        delta_alt = newAa.alt - oldAa.alt
+        # We assume here that the offset is the change of the pointing
+        # direction of the mount. E.g. if we sent +1deg in alt then
+        # the mount moves horizontally to the right. The effect of
+        # the targets is the opposite, which means they appear more
+        # to the left in the new coordinate system.
+        delta_alt = oldAa.alt - newAa.alt
 
-        # difference new minus old azimuth
-        delta_az = newAa.az - oldAa.az
+        delta_az = oldAa.az - newAa.az
 
         return delta_az, delta_alt
 
-#     def offset_px_to_radec(self, oldx, oldy, newx, newy):
-#         """
-#         Given an old pixel position (px-x,px-y) and a new pixel position (n-x,n-y),
-#         compute the associated change of the reference pointing coordinate in
-#         azimuth and alitude as two differential angles.
-# 
-#         :param oldx: pixel first coordinate in FITS conventions
-#         :type oldx: int or float
-#         :param oldy: pixel second coordinate in FITS conventions
-#         :type oldy: int or float
-#         :param newx: desired new first coordinate
-#         :type newx: int or float
-#         :param newy: desired new second coordinate
-#         :type newy: int or float
-# 
-#         :return: a pair of two Angles, first the change in azimuth (0=N, 90=E) then the 
-#              change in altitude (0=horizon)
-#         :rtype: astropy.coordinates.Angle pair
-#         """
+    def offset_px_to_radec(self, old_x, old_y, new_x, new_y):
+        """
+        Given an old pixel position (old_x,old_y) and a new pixel position (new_x,new_y),
+        compute the associated change of the reference pointing coordinate in
+        equatorial coordinates (ra/dec) as two differential angles.
+
+        :param old_x: pixel first coordinate in FITS conventions
+        :type old_x: int or float
+        :param old_y: pixel second coordinate in FITS conventions
+        :type old_y: int or float
+        :param new_x: desired new first coordinate
+        :type new_x: int or float
+        :param new_y: desired new second coordinate
+        :type new_y: int or float
+
+        :return: a pair of two Angles, first the change in ra then the change in dec
+        :rtype: astropy.coordinates.Angle pair
+        """
+
+        # compute where the old equatorial ra/dec are
+        old_radec = self.wcs.all_pix2world([old_x],[old_y],1,ra_dec_order=True)
+        old_object = astropy.coordinates.SkyCoord(ra=old_radec[0], dec=old_radec[1],unit="deg")
+
+        # compute where the new  equatorial ra/dec are
+        new_radec = self.wcs.all_pix2world([new_x],[new_y],1,ra_dec_order=True)
+        new_object = astropy.coordinates.SkyCoord(ra=new_radec[0], dec=new_radec[1],unit="deg")
+
+        # one could (easier, faster) just return old_radec[0]-new_radec[0]
+        # and old_radec[1] - new_radec[1] here, converted to the Angle class...
+
+        # To be checked: is this the subtraction with the correct sign/order???
+        # or does the PW mount want the opposite signs??
+        # This here constructs old_object minus new_object, so uses the same
+        # sign convention as in offset_px_toazalt().
+
+        return new_object.spherical_offsets_to(old_object)

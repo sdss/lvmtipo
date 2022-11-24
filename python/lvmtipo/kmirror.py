@@ -15,6 +15,7 @@ __all__ = ['Kmirror']
 
 class Kmirror():
     """ Functions to represent K-mirror angles as Mocon steps
+    ..todo.. Introduce wobbles by halfcone radius and offset of the throw direction
     """
 
     def __init__(self, home_is_west = False, home_offset = 135.0, steps_per_turn=360*180*100):
