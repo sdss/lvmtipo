@@ -201,12 +201,13 @@ class Siderostat():
            flen=1839.8, dist_cam_edge=11.14771) :
         """ Convert the parameters to FITS WCS header cards.
         This traces the position angle implied by the siderostat and number of mirror
-        reflections through the K-mirror if applicable and through the
+        reflections through the K-mirror (if applicable) and through the
         prisms if applicable to predict the key WCS keywords.
         .. warn:: this assumes that the FITS files are read out as
            in the MPIA test setup: all east/west/center cameras with the
            long edge up-down, no rotation by any 90 or 180 degrees in any
-           python software that may spring up after Oct 2022.
+           python software that may spring up after Oct 2022 and no ad-hoc
+           decisions to mount the cameras in different orientations.
 
         :param site: geographic ITRF location of the observatory
         :type site: lvmtipo.Site
@@ -1068,6 +1069,8 @@ class Siderostat():
         # posang_fp is in radians.
         if isinstance(degNCP, Fiber) :
             posang_fp = degNCP.labAngle()
+        elif isinstance(degNCP, astropy.coordinates.Angle) :
+            posang_fp = degNCP.radian
         else:
             posang_fp = math.radians(degNCP)
 
