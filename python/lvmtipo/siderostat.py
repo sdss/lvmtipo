@@ -360,7 +360,7 @@ class Siderostat():
         # This block of code should be removed to increase efficiency at some time in the future
         patchTime2 = astropy.time.Time('2022-11-20T00:00:00',format='isot',scale='tai')
         # positive if patched/corrected, i.e., after patchTime2
-        sinceTime2 = time - patchTime2
+        sinceTime2 = now - patchTime2
         if sinceTime2.to_value('jd') < 0:
             # in the early configuration files the data streams of the east
             # and west cameras at MPIA were wrong/swapped
