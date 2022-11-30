@@ -620,8 +620,15 @@ class Siderostat():
   
         # compute the parallactic angle 
         pa = target.parallact(site, ambi, now)
-        key=astropy.io.fits.Card("PARANG", math.degrees(pa), "[deg] parallactic angle")
+        key=astropy.io.fits.Card("PARANG", pa.deg, "[deg] parallactic angle")
         wcshdr.append(key)
+
+        # append another WCS which maps pixels to microns in the focal plane
+        self.to_header_wcs_f(wcshdr,is_agw, is_age, genrevx, genrevy,
+            pixsize, wd, hd, bin=bin, dist_cam_edge=dist_cam_edge)
+
+        # append another WCS which maps pixels to the alt-az coordinates
+        self.to_header_wcs_a(wcshdr, numpy.array(xy_to_ad,numpy.double), pa, horiz, crpix1,crpix2)
 
         # update DATE
         fwritetime = datetime.datetime.utcnow()
@@ -630,6 +637,263 @@ class Siderostat():
         wcshdr.append(key)
 
         return wcshdr
+
+    def to_header_wcs_a(self, wcshdr, xy_to_ad, pa, horiz,crpix1,crpix2) :
+        """ Collect the parameters for a WCS system for alt/az angles.
+        The strategy is to mix the parallactic angle into the CDi_j matrix
+        such that aspects of flips etc are already worked into this.
+
+        :param wcshdr: the list of header cards to be augmented here
+        :type wcshdr:
+
+        :param xy_to_ad: The CDi_j rotation for the converstion to ra/dec angles
+        :type xy_to_ad: numpy.array
+
+        :param pa: The parallactic angle
+        :type pa: astropy.coordinates.Angle
+
+        :param horiz: the alt/az of the pointing center
+        :type horiz: astropy.coordinates.AltAz
+
+        :param crpix1: pixel along x (FITS coordnates) of the horiz point
+        :type crpix1: float
+
+        :param crpix1: pixel along y (FITS coordnates) of the horiz point
+        :type crpix1: float
+        """
+
+        # select suffix 'A' for this WCS, valid values are 'A'to 'Z' and
+        # this must not be the same as in the to_header_wcs_f() add-on
+        suff='A'
+
+        # add the main pointing keywords
+        key = astropy.io.fits.Card("CUNIT1"+suff, "deg", "WCS units along axis 1")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card("CUNIT2"+suff, "deg", "WCS units along axis 2")
+        wcshdr.append(key)
+        # key = astropy.io.fits.Card("CTYPE1"+suff, "AZ---TAN", "WCS type axis 1")
+        key = astropy.io.fits.Card("CTYPE1"+suff, "HOLN-TAN", "WCS type axis 1")
+        wcshdr.append(key)
+        # key = astropy.io.fits.Card("CTYPE2"+suff, "ALT--TAN", "WCS type axis 2")
+        key = astropy.io.fits.Card("CTYPE2"+suff, "HOLT--TAN", "WCS type axis 2")
+        wcshdr.append(key)
+
+        key=astropy.io.fits.Card( "CRPIX1"+suff, crpix1, "[px] point cntr along axis 1")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CRPIX2"+suff, crpix2, "[px] point cntr along axis 2")
+        wcshdr.append(key)
+
+        # put the origin of the focal plane coordinate system at the center of
+        # the center camera of fiber bundle
+        key = astropy.io.fits.Card( "CRVAL1"+suff, horiz.az.deg, "[deg] azimuth at ref pixel")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card( "CRVAL2"+suff, horiz.alt.deg, "[deg] altitude at ref pixel")
+        wcshdr.append(key)
+
+        # if xy_to_ad is the existing transformation to Ra/dec we need
+        # to find the (left) matrix ad_to_aa depending on pa which rotations
+        # this further. If pa is positive and the images are flipped or not flipped
+        # (az)    (-cos pa sin pa)   (ra)
+        #       =                  *
+        # (alt)   ( sin pa cos pa)  (dec)
+        cospa = math.cos(pa.radian)
+        sinpa = math.sin(pa.radian)
+        ad_to_aa = numpy.array([[-cospa,sinpa],[sinpa,cospa]],numpy.double)
+        xy_to_aa = numpy.matmul(ad_to_aa, xy_to_ad)
+
+        key=astropy.io.fits.Card( "CD1_1"+suff, xy_to_aa[0][0], "[deg/px] WCS matrix diagonal x->az")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD1_2"+suff, xy_to_aa[0][1], "[deg/px] WCS matrix outer diagonal y->az")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD2_1"+suff, xy_to_aa[1][0], "[deg/px] WCS matrix outer diagonal x->alt")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD2_2"+suff, xy_to_aa[1][1], "[deg/px] WCS matrix diagonal y-> alt")
+        wcshdr.append(key)
+
+        #key=astropy.io.fits.Card( "LONPOLE"+suff, 50., "[deg]")
+        #wcshdr.append(key)
+        #key=astropy.io.fits.Card( "LATPOLE"+suff, 30., "[deg]")
+        #wcshdr.append(key)
+
+    def to_header_wcs_f(self, wcshdr, is_agw, is_age,
+           genrevx, genrevy, pixsize, wd, hd, bin =1,
+           dist_cam_edge=11.14771) :
+        """ Collect the parameters for a second WCS system for focal plane coordinates.
+        The primary list of parameters collected in to_header_wcs() convert pixels
+        to RA/DEC coordinates, whereas this set here converts pixels to 
+        micrometers in a comman focal plane of the guide cameras and fiber heads.
+        The names for this system are ending on 'F' (short for focal plane).
+        The main purpose is to have a quick online conversion from guide camera
+        pixels to fiber head positions.
+
+        :param wcshdr: the list of FITS header cards to be augmented here.
+        :type wcshdr: SkymakerCamera
+
+        :param is_agw: true if this describes pixels on a west AG camera
+        :type is_agw: bool
+
+        :param is_age: true if this describes pixels on a east AG camera
+             If neither is_agw nor is_age are True we consider this a center camera.
+        :type is_age: bool
+
+        :param genrevx: True if the readout direction along x was reversed
+             in the araviscam interface before creating the FITS file.
+        :type genrevx: bool
+
+        :param genrevy: True if the readout direction along y was reversed
+             in the araviscam interface before creating the FITS file.
+        :type genrevy: bool
+
+        :param pixsize: pixel size in microns, not binned
+        :type pixsize: float
+
+        :param bin: binning factor in the image
+        :type bin: int
+
+        :param wd: width of the image in pixels (after binning)
+              This is typically 1600 for the monochrome cameras and 3200 for 
+              the color camera (binning=1).
+        :type wd: int
+
+        :param hd: height of the image in pixels (after binning)
+              This is typically 1100 for the monochrome cameras and 2200 for 
+              the color camera (binning=1).
+        :type hd: int
+
+        :param dist_cam_edge: the distance of the long east or west FLIR camera edge to
+             the fiber bundle centre in millimeters
+             Is 7.144+4.0 mm according to SDSS-V_0110 figure 6
+             and 11.14471 according to figure 3-1 of LVMi-0081
+        :type dist_cam_edge: float
+        """
+
+        # suffix for the WCS keywords. Must be on of the letters A to Z
+        suff = 'F'
+
+        if is_agw or is_age:
+            is_agc = False
+        else:
+            is_agc = True
+
+        # since the camera has already performed internally one
+        # flip around the long axis assuming there is a single lens
+        # and that the output stream should be in scan raster format we start
+        # with flipCDy=true, which means the camera reads the pixels (assuming
+        # the PoE connector is at the bottom) from bottom row to top row, left to right.
+        # Note that almost always digrevy=true later on, such that we actully
+        # may have read this top to bottom. flipCDy is relative to the scan raster format.
+        flipCDy=True
+        flipCDx=False
+
+        # 4 combinations of genrev[xy] individually true or false
+        if genrevx:
+            if genrevy:
+                # both flipped (i.e., a 180 deg rotation)
+                flipCDx = not flipCDx
+                flipCDy = not flipCDy
+            else:
+                # x flipped, y not flipped
+                flipCDx = not flipCDx
+        else:
+            if genrevy:
+                # x not flipped but y flipped
+                # Note that this is the operation as above for the kmirror at angle 0
+                # a y-flip is the same as an x-flip plus a 180 deg rotation
+                flipCDy = not flipCDy
+
+        #if is_age or is_agw:
+        #    n_refl = 1 
+        #elif is_agc :
+        #    n_refl = 0 
+        #else :
+        #    raise ValueError("one of age, age, agc must be True ")
+
+        # add the main pointing keywords
+        key = astropy.io.fits.Card("CUNIT1"+suff, "um", "WCS units along axis 1")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card("CUNIT2"+suff, "um", "WCS units along axis 2")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card("CTYPE1"+suff, "FOCP-X", "WCS type axis 1")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card("CTYPE2"+suff, "FOCP-Y", "WCS type axis 2")
+        wcshdr.append(key)
+
+        # put the origin of the focal plane coordinate system at the center of
+        # the center camera of fiber bundle
+        key = astropy.io.fits.Card( "CRVAL1"+suff, 0, "[um] FP x for ref pixel")
+        wcshdr.append(key)
+        key = astropy.io.fits.Card( "CRVAL2"+suff, 0, "[um] FP y for ref pixel")
+        wcshdr.append(key)
+
+        # relevant pixel size for our conversion are the binned ones
+        pixsize *= bin
+
+        # convert disgtcamEdgeCtr from mm to micron and then to pixels
+        # This is the distance from the long edge that is narrowest to
+        # the fiber center after projection into the focal plane.
+        dist_cam_edge *= 1000.0 / pixsize
+
+        # distance from the middle of the east or west camera to fiber ctner in pixels
+        # note that hd is already in binned pixels (as in the FITS NAXIS)
+        dist_cam_mid = hd / 2 + dist_cam_edge
+    
+        # where is the center of image away in the pixel coordinate system
+        # of the camera? For the x-position this is in the middle of the
+        # camera along the long axis because all cameras are installed up-down
+        # For age and agw the wd parameters are 1600 and the hd 1100 (not binned).
+        crpix1 = wd / 2 + 0.5
+        crpix2 = hd / 2 + 0.5
+    
+        if is_agc :
+            # x pixel points up and y-pixel points left
+            xy_to_ad=[[0,-pixsize],[pixsize,0]]
+        elif is_agw :
+            # the direction from the prism center to the fiber center
+            # is walkign east, which is in the camera walking to the lower edge
+            # in raster scan order (flipCDy=false) this means increasing pixy
+            if flipCDy:
+                crpix2 -= dist_cam_mid
+            else:
+                crpix2 += dist_cam_mid
+            # x pixel points down and y-pixel points into focal plane and
+            # considering the prism reflection left in the focal plane
+            xy_to_ad=[[0,-pixsize],[-pixsize,0]]
+        elif is_age :
+            # the direction from the prism center to the fiber center
+            # is walkign west, which is in the camera walking to the lower edge
+            # in raster scan order (flipCDy=false) this means increasing pixy
+            if flipCDy:
+                crpix2 -= dist_cam_mid
+            else:
+                crpix2 += dist_cam_mid
+            # x pixel points up and y-pixel points into focal plane and
+            # considering the prism reflection right in the focal plane
+            xy_to_ad=[[0,pixsize],[pixsize,0]]
+        else :
+            raise ValueError("one of age, age, agc must be True ")
+
+        key=astropy.io.fits.Card( "CRPIX1"+suff, crpix1, "[px] point cntr along axis 1")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CRPIX2"+suff, crpix2, "[px] point cntr along axis 2")
+        wcshdr.append(key)
+
+        if flipCDx :
+            # direction of x pixels flipped
+            xy_to_ad[0][0] *= -1 
+            xy_to_ad[1][0] *= -1 
+        if flipCDy :
+            # direction of y pixels flipped
+            xy_to_ad[0][1] *= -1 
+            xy_to_ad[1][1] *= -1 
+
+        key=astropy.io.fits.Card( "CD1_1"+suff, xy_to_ad[0][0], "[um/px] WCS matrix diagonal x->umHor")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD1_2"+suff, xy_to_ad[0][1], "[um/px] WCS matrix outer diagonal y->umHor")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD2_1"+suff, xy_to_ad[1][0], "[um/px] WCS matrix outer diagonal x->umVert")
+        wcshdr.append(key)
+        key=astropy.io.fits.Card( "CD2_2"+suff, xy_to_ad[1][1], "[um/px] WCS matrix diagonal y->umVert")
+        wcshdr.append(key)
 
     def to_wcs(self, site, target, camera, ambi, k_mocon_steps, ag_cam_name,
            genrevx, genrevy, kmirr, time=None,pixsize=None,bin=None,wd=None,hd=None,flen=1839.8,

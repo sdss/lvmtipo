@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-11-23
+# @Date: 2022-11-29
 # @Filename: target.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -175,8 +175,8 @@ class Target():
         :param time: time of the observation
         :type time: astropy.time.Time
 
-        :return: The parallactic angle in radians
-        :rtype: float
+        :return: The parallactic angle
+        :rtype: astropy.coordinates.Angle
         """
         #define the zenith in the topocentric horizontal frame (alt,az)=(90,0)
         earthloc = site.toEarthLocation()
@@ -197,4 +197,4 @@ class Target():
         zeni= zeni_hori.transform_to(icrs_frame)
         # and the parallactic angle is the position angle of the zenith, coordinates.Angle
         pa = self.targ.position_angle(zeni)
-        return pa.radian
+        return pa
