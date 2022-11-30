@@ -43,7 +43,7 @@ class Fiber():
 
     def xyFocalPlaneSAB(self, pixperrow):
         """
-        :return east and up location in units of mm for Sciene IFU or background
+        :return east and up location in units of um for Sciene IFU or background
         """
         idx = int(self.name[3:])
         # Note that there is no need to check the upper index
@@ -146,6 +146,7 @@ class Fiber():
         # location of x=east, y=up of P2-1 or P1-1
         x = self.SQRT3_2 * row
         y = -0.5* row + idx
+        r = math.hypot(x,y)
         # angle relative to 0=up, east=90
         baseAng = math.atan2(x,y)
         # for odd 0-based indices use 60 deg = pi/3 rad complement
@@ -157,7 +158,7 @@ class Fiber():
         # the rotation angle increases by 60 deg clockwise.
         rot60 = fidx // 2
         baseAng += self.PI_3*rot60
-        return self.pitch*math.sin(baseAng), self.pitch*math.cos(baseAng)
+        return self.pitch*r*math.sin(baseAng), self.pitch*r*math.cos(baseAng)
 
     def xyFocalPlane(self):
         """
@@ -185,3 +186,63 @@ class Fiber():
         e, up = self.xyFocalPlane()
         # return (math.pi/2.0 -math.atan2(up,e)) # worse: might be outside +-180deg
         return math.atan2(e,up)
+
+    @staticmethod
+    def dump_gnuplot():
+        """ Dump the circle locations (in microns) to stdout
+        suitable for a gnuplot plotting with "set style data circle"
+        The result may be run thru gnuplot, then convert of ImageMagick
+        to generate FITS files of the the fiber bundles in the focal plane.
+
+        from lvmtipo import Fiber
+        fiber.dump_gnuplot() > fib.dat
+        fiber.dump_gnuplot() | fgrep "#" | tr "#" " " > fib.gp
+        convert fib.pdf fib.fits
+        """
+        for bundle in [ 'S1-','S2-','S3-'] :
+            for i in range(602):
+                name = bundle+str(i)
+                try:
+                    fib = Fiber(name)
+                    x, y = fib.xyFocalPlane()
+                    print(x, " ", y, " ", fib.pitch*0.3)
+                    print("# set label \"", name , "\" at ", x, ",",y)
+                except:
+                    pass
+        print("\n\n")
+
+        for bundle in [ 'A1-','A2-','A3-'] :
+            for i in range(22):
+                name = bundle+str(i)
+                try:
+                    fib = Fiber(name)
+                    x, y = fib.xyFocalPlane()
+                    print(x, " ", y, " ", fib.pitch*0.3)
+                    print("# set label \"", name , "\" at ", x, ",",y)
+                except:
+                    pass
+        print("\n\n")
+
+        for bundle in [ 'B1-','B2-','B3-'] :
+            for i in range(22):
+                name = bundle+str(i)
+                try:
+                    fib = Fiber(name)
+                    x, y = fib.xyFocalPlane()
+                    print(x, " ", y, " ", fib.pitch*0.3)
+                    print("# set label \"", name , "\" at ", x, ",",y)
+                except:
+                    pass
+        print("\n\n")
+
+        for bundle in [ 'P1-','P2-'] :
+            for i in range(13):
+                name = bundle+str(i)
+                try:
+                    fib = Fiber(name)
+                    x, y = fib.xyFocalPlane()
+                    print(x, " ", y, " ", fib.pitch*0.3)
+                    print("# set label \"", name , "\" at ", x, ",",y)
+                except Exception as e:
+                    # print( str(e)) # invalid fiber names...
+                    pass

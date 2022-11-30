@@ -623,11 +623,11 @@ class Siderostat():
         key=astropy.io.fits.Card("PARANG", pa.deg, "[deg] parallactic angle")
         wcshdr.append(key)
 
-        # append another WCS which maps pixels to microns in the focal plane
+        # append another WCS 'F' which maps pixels to microns in the focal plane
         self.to_header_wcs_f(wcshdr,is_agw, is_age, genrevx, genrevy,
             pixsize, wd, hd, bin=bin, dist_cam_edge=dist_cam_edge)
 
-        # append another WCS which maps pixels to the alt-az coordinates
+        # append another WCS 'A' which maps pixels to the alt-az coordinates
         self.to_header_wcs_a(wcshdr, numpy.array(xy_to_ad,numpy.double), pa, horiz, crpix1,crpix2)
 
         # update DATE
@@ -641,10 +641,10 @@ class Siderostat():
     def to_header_wcs_a(self, wcshdr, xy_to_ad, pa, horiz,crpix1,crpix2) :
         """ Collect the parameters for a WCS system for alt/az angles.
         The strategy is to mix the parallactic angle into the CDi_j matrix
-        such that aspects of flips etc are already worked into this.
+        of the primary ra/dec WCS such that aspects of flips etc are already known from this.
 
         :param wcshdr: the list of header cards to be augmented here
-        :type wcshdr:
+        :type wcshdr: astropy.io.fits.Header
 
         :param xy_to_ad: The CDi_j rotation for the converstion to ra/dec angles
         :type xy_to_ad: numpy.array
