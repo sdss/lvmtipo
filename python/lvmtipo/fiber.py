@@ -187,62 +187,58 @@ class Fiber():
         # return (math.pi/2.0 -math.atan2(up,e)) # worse: might be outside +-180deg
         return math.atan2(e,up)
 
+    def dump_gnuplot(self,idx) :
+        x, y = self.xyFocalPlane()
+        print(x, " ", y, " ", self.pitch*0.2)
+        # print(x, " ", y)
+        print("# set label \"", self.name[1:] , "\" at ", x, ",",y)
+        # print("# set label \"", idx , "\" at ", x, ",",y)
+
+
     @staticmethod
-    def dump_gnuplot():
-        """ Dump the circle locations (in microns) to stdout
-        suitable for a gnuplot plotting with "set style data circle"
-        The result may be run thru gnuplot, then convert of ImageMagick
-        to generate FITS files of the the fiber bundles in the focal plane.
+    def dump_gnuplot_frame() :
+        # add a reference frame 2200x3200 of a FLIR color 4.5 um camera
+        # that's 9900 x 14400 um.
+        print("# set arrow 1 from -4950,-7200 to 4950,-7200")
+        print("# set arrow 2 from 4950,-7200 to 4950,7200")
+        print("# set arrow 3 from 4950,7200 to -4950,7200")
+        print("# set arrow 4 from -4950,7200 to -4950,-7200")
+        print("# set arrow 1 nohead lw 4")
+        print("# set arrow 2 nohead lw 4")
+        print("# set arrow 3 nohead lw 4")
+        print("# set arrow 4 nohead lw 4")
+        print("\n\n")
 
-        from lvmtipo import Fiber
-        fiber.dump_gnuplot() > fib.dat
-        fiber.dump_gnuplot() | fgrep "#" | tr "#" " " > fib.gp
-        convert fib.pdf fib.fits
+    @staticmethod
+    def dump_gnuplot_bund(bundles):
         """
-        for bundle in [ 'S1-','S2-','S3-'] :
-            for i in range(602):
-                name = bundle+str(i)
+        :param bundles: a list of fiber bundle names (each name 3 letters ending -)
+        :type bundles: a list of str
+        """
+        for bundle in bundles :
+            for idx in range(602):
+                name = bundle+str(idx)
                 try:
                     fib = Fiber(name)
-                    x, y = fib.xyFocalPlane()
-                    print(x, " ", y, " ", fib.pitch*0.3)
-                    print("# set label \"", name , "\" at ", x, ",",y)
-                except:
-                    pass
-        print("\n\n")
-
-        for bundle in [ 'A1-','A2-','A3-'] :
-            for i in range(22):
-                name = bundle+str(i)
-                try:
-                    fib = Fiber(name)
-                    x, y = fib.xyFocalPlane()
-                    print(x, " ", y, " ", fib.pitch*0.3)
-                    print("# set label \"", name , "\" at ", x, ",",y)
-                except:
-                    pass
-        print("\n\n")
-
-        for bundle in [ 'B1-','B2-','B3-'] :
-            for i in range(22):
-                name = bundle+str(i)
-                try:
-                    fib = Fiber(name)
-                    x, y = fib.xyFocalPlane()
-                    print(x, " ", y, " ", fib.pitch*0.3)
-                    print("# set label \"", name , "\" at ", x, ",",y)
-                except:
-                    pass
-        print("\n\n")
-
-        for bundle in [ 'P1-','P2-'] :
-            for i in range(13):
-                name = bundle+str(i)
-                try:
-                    fib = Fiber(name)
-                    x, y = fib.xyFocalPlane()
-                    print(x, " ", y, " ", fib.pitch*0.3)
-                    print("# set label \"", name , "\" at ", x, ",",y)
+                    fib.dump_gnuplot(idx)
                 except Exception as e:
-                    # print( str(e)) # invalid fiber names...
-                    pass
+                    pass  # index out of range
+                    # print(idx,str(e))
+        Fiber.dump_gnuplot_frame()
+
+#     @staticmethod
+#     def dump_gnuplot_all():
+#         """ Dump the circle locations (in microns) to stdout
+#         suitable for a gnuplot plotting with "set style data circle"
+#         The result may be run thru gnuplot, then convert of ImageMagick
+#         to generate FITS files of the the fiber bundles in the focal plane.
+# 
+#         from lvmtipo import Fiber
+#         fiber.dump_gnuplot() > fib.dat
+#         fiber.dump_gnuplot() | fgrep "#" | tr "#" " " > fib.gp
+#         convert fib.png fib.fits
+#         """
+#         Fiber.dump_gnuplot( [ 'S1-','S2-','S3-'] )
+#         Fiber.dump_gnuplot( [ 'A1-','A2-','A3-'] )
+#         Fiber.dump_gnuplot( [ 'B1-','B2-','B3-'] )
+#         Fiber.dump_gnuplot( [ 'P1-','P2-'] )
