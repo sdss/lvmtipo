@@ -1,0 +1,220 @@
+# Yaml configuration file for optical constants
+# and distortions (relative to some perfectly algined, as-designed optics)
+# for the 4 tables (4 telescopes) of the LVMT.
+
+# Note that araviscam related parameters like readout directions
+# of the cameras, serial numbers and IP-addresses
+#  are not included here but in a differnt Yaml files in sdss/lvmcam .
+site:
+    # geographic longitude in degrees. This uses
+    # the international convention where east is positive, whereas
+    # in some US-american variants the opposite sign might be seen.
+    geolon: 8.724  # MPIA
+    # geolon: -70.70056 # LCO
+    # geolon: -105.8202778 # APO -105d49m13s
+
+    # geographic latitude in degrees
+    # Note that this should be the same value as used in the
+    # assembly of the pointing model, see the parameters
+    # Latitude and Longitude in Settings/PWI4.cfg somewhere
+    # in some relevant container.
+    geolat: 49.3965  # MPIA
+    # geolat: -29.01091  # LCO
+    # geolat: 32.78028  # APO 32d46m49s
+
+    # geographic altitude in meters above sea level
+    geoalt: 560.0  # MPIA
+    # geoalt: 2280. # LCO
+    # geoalt: 2788. # APO
+
+sci:
+    sid:
+        # altitude and azimuth of the bench orientation in degrees,
+        # which is the direction of the chief ray from M2 and lens into the focal plane.
+        # The az-angles at the MPIA test setup are basically opposite
+        # to the standard at LCO. Both angles can be read off the
+        # pointing model: The az angle is the one of the pointing
+        # model and alt is basically the difference between the
+        # value of the pointing model (which gives a polar offset)
+        # and the latitude of the observatory.
+        # At LCO both angles are very close to zero if bench and pier
+        # are well aligned. The required accuracy is 1/20 deg to
+        # meet the requirements on derotator speed accuracies.
+        alt: 0. # MPIA
+        # alt: 0. # LCO
+
+        # az=0 looking north (LCO) and az=180 looking south (MPIA),
+        # positive if looking east.
+        az: -180 # MPIA
+        # az: 0. # LCO
+
+        # offset of the motor axis that rotates M1 in degrees
+        # relative to the normalization in the Latex doc
+        m1_off: 0.
+        # offset of the motor axis that rotates M2 in degrees
+        # relative to the normalization in the Latex doc
+        m2_off: 0.
+    km:
+        # the distance between home position and the up position
+        # in degrees. This is always a positive number.
+        home: 135
+
+        # horizontal (x, east=+) and vertical (y, up=+)
+        # position of the pointing center in the focal plane in microns.
+        # this is the position of the point on which a particular beam
+        # stays fixed when the K-mirror rotates. For perfectly aligned
+        # lens and K-mirror both would be zero. For a perfectly aligned
+        # center camera one could derive this from the center of a K-mirror
+        # fast-sweep track by multiplying pixels with the pixel size (4.5 um),
+        # of course taking into acount the camera orientation.
+        hot_x: 0.0
+        hot_y: 0.0
+        # direction of the wobble in degrees, which means a ray on-axis
+        # in the pointing model (but missing the hot_x,y) appears in
+        # that direcitno in the FP (where up=0, right=east=positive) ??
+        wob_dir: 0.0
+    age:
+        descr: "Guider Camera sci.age"
+        
+        # rot, fp_x and fp_y are the angle (degrees, clockwise) and
+        # position of the central pixel (that's 800.5, 550.5 pix in FITS)
+        # in microns
+        # in a common focal plane view as seen through a point source microscope.
+        # Note that this defines signs, directions etc unambiguously.
+        # Note that in a PSM the prism has already flipped the images,
+        # so the angle is the negative of the angle relative to looking
+        # directly at the front face of the age or agw camera. Because the age and agw
+        # and agc are mounted with the long edge up, fp_x becomes a correction
+        # to the short-edge coordinates and fp_y a correction to the long-edge
+        # coordinates.
+        # In fp_x and fp_y there is a as-designed offset of 11.14471 mm
+        # from the center until reaching the long edges of the cameras,
+        # according to figure 3-1 of LVMi-0081 and there is another 550*9.0 um
+        # for a 1100 short edge number of 9 mu pixels to reach the center.
+        rot: 0.0
+        fp_x: 16094.71
+        fp_y: 0.0
+
+    agw:
+        descr: "Guider Camera sci.agw"
+        rot: 0.0
+        fp_x: -16094.71
+        fp_y: 0.0
+
+    agc:
+        # agc is nominally the center (color) camera, but
+        # if that is absent is is used to specify the orientation
+        # and offset of the fiber bundle....
+        descr: "Guider Camera sci.agc"
+        rot: 0.0
+        fp_x: 0.0
+        fp_y: 0.0
+
+skye:
+    sid:
+        alt: 0. # MPIA
+        # alt: 0. # LCO
+
+        # az=0 looking north (LCO) and az=180 looking south (MPIA),
+        # positive if looking east.
+        az: -180 # MPIA
+        # az: 0. # LCO
+
+        # offset of the motor axis that rotates M1 in degrees
+        # relative to the normalization in the Latex doc
+        m1_off: 0.
+        # offset of the motor axis that rotates M2 in degrees
+        # relative to the normalization in the Latex doc
+        m2_off: 0.
+    km:
+        home: 135
+        hot_x: 0.0
+        hot_y: 0.0
+    age:
+        descr: "Guider Camera skye.age"
+        rot: 0.0
+        fp_x: 16094.71
+        fp_y: 0.0
+
+    agw:
+        descr: "Guider Camera skye.agw"
+        rot: 0.0
+        fp_x: -16094.71
+        fp_y: 0.0
+
+    agc:
+        descr: "Guider Camera skye.agc"
+        rot: 0.0
+        fp_x: 0.0
+        fp_y: 0.0
+
+skyw:
+    sid:
+        alt: 0. # MPIA
+        # alt: 0. # LCO
+
+        # az=0 looking north (LCO) and az=180 looking south (MPIA),
+        # positive if looking east.
+        az: -180 # MPIA
+        # az: 0. # LCO
+
+        # offset of the motor axis that rotates M1 in degrees
+        # relative to the normalization in the Latex doc
+        m1_off: 0.
+        # offset of the motor axis that rotates M2 in degrees
+        # relative to the normalization in the Latex doc
+        m2_off: 0.
+    km:
+        home: 135
+        hot_x: 0.0
+        hot_y: 0.0
+    age:
+        descr: "Guider Camera skyw.age"
+        rot: 0.0
+        fp_x: 16094.71
+        fp_y: 0.0
+
+    agw:
+        descr: "Guider Camera skyw.agw"
+        rot: 0.0
+        fp_x: -16094.71
+        fp_y: 0.0
+
+    agc:
+        descr: "Guider Camera skye center"
+        rot: 0.0
+        fp_x: 0.0
+        fp_y: 0.0
+
+spec:
+    sid:
+        alt: 0. # MPIA
+        # alt: 0. # LCO
+
+        # az=0 looking north (LCO) and az=180 looking south (MPIA),
+        # positive if looking east.
+        az: -180 # MPIA
+        # az: 0. # LCO
+
+        # offset of the motor axis that rotates M1 in degrees
+        # relative to the normalization in the Latex doc
+        m1_off: 0.
+        # offset of the motor axis that rotates M2 in degrees
+        # relative to the normalization in the Latex doc
+        m2_off: 0.
+
+    # km: # no K-mirror on this bench
+    age:
+        descr: "Guider Camera spec.age"
+        rot: 0.0
+        fp_x: 16094.71
+        fp_y: 0.0
+
+    # agw: # no agw on this bench
+
+    agc:
+        descr: "Guider Camera spec.agc"
+        rot: 0.0
+        fp_x: 0.0
+        fp_y: 0.0
+
