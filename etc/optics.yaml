@@ -8,7 +8,7 @@
 site:
     # geographic longitude in degrees. This uses
     # the international convention where east is positive, whereas
-    # in some US-american variants the opposite sign might be seen.
+    # in some US-american variants (xephem...) the opposite sign might be seen.
     geolon: 8.724  # MPIA
     # geolon: -70.70056 # LCO
     # geolon: -105.8202778 # APO -105d49m13s
@@ -48,12 +48,15 @@ sci:
         az: -180 # MPIA
         # az: 0. # LCO
 
-        # offset of the motor axis that rotates M1 in degrees
+        # offset of the PW motor axis ax1 that rotates M1 in degrees
         # relative to the normalization in the Latex doc
-        m1_off: 0.
-        # offset of the motor axis that rotates M2 in degrees
+        # warning: the current m1_off and m2_off are those of a single (!) MPIA bench test
+        # and need to be recalibrated individually for each siderostat
+        # to match tolerances in mechanics that defines these parameters.
+        m1_off: 118.969
+        # offset of the PW motor axis ax0 that rotates M2 in degrees
         # relative to the normalization in the Latex doc
-        m2_off: 0.
+        m2_off: -169.752
     km:
         # the distance between home position and the up position
         # in degrees. This is always a positive number.
@@ -122,10 +125,10 @@ skye:
 
         # offset of the motor axis that rotates M1 in degrees
         # relative to the normalization in the Latex doc
-        m1_off: 0.
+        m1_off: 118.969
         # offset of the motor axis that rotates M2 in degrees
         # relative to the normalization in the Latex doc
-        m2_off: 0.
+        m2_off: -169.752
     km:
         home: 135
         hot_x: 0.0
@@ -160,10 +163,10 @@ skyw:
 
         # offset of the motor axis that rotates M1 in degrees
         # relative to the normalization in the Latex doc
-        m1_off: 0.
+        m1_off: 118.969
         # offset of the motor axis that rotates M2 in degrees
         # relative to the normalization in the Latex doc
-        m2_off: 0.
+        m2_off: -169.752
     km:
         home: 135
         hot_x: 0.0
@@ -198,10 +201,10 @@ spec:
 
         # offset of the motor axis that rotates M1 in degrees
         # relative to the normalization in the Latex doc
-        m1_off: 0.
+        m1_off: 118.969
         # offset of the motor axis that rotates M2 in degrees
         # relative to the normalization in the Latex doc
-        m2_off: 0.
+        m2_off: -169.752
 
     # km: # no K-mirror on this bench
     age:

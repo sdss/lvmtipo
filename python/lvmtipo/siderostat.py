@@ -33,7 +33,8 @@ class Siderostat():
     ..todo.. add the roll angle as the 3rd angle besides azang and zenang
     """
 
-    def __init__(self, zenang=90.0, azang=0.0, medSign=-1, m1m2dist=240.0):
+    def __init__(self, zenang=90.0, azang=0.0, medSign=-1, m1m2dist=240.0, om1_off_ang = 118.969,
+                 om2_off_ang = -169.752):
         """ A siderostat of 2 mirrors
         :param zenang: Zenith angle of the direction of the exit beam (degrees)
                    in the range 0..180. Default is the design value of the LVMT: horizontal
@@ -57,6 +58,14 @@ class Siderostat():
                        by subracting the 84 and 60 cm distance of the
                        output pupils to M1 and M2.
         :type m1m2dist: float
+        :param om2_off_ang: the offset angle which aligns PW motor angle of the M2 axis,
+                       which is ax0 of the PW GUI, to the angles of the manuscript.
+        :type om2_off_ang: float
+        :param om1_off_ang: the offset angle which aligns PW motor angle of the M1 axis,
+                       which is ax1 of the PW GUI, to the angles of the manuscript, degrees.
+                      om1_off_ang and om2_off_ang are either angles in degrees or
+                      both astropy.coordinates.Angle
+        :type om1_off_ang: float
         """
 
         # the vector b[0..2] is the three cartesian coordinates
@@ -89,6 +98,29 @@ class Siderostat():
         self.box[1] = -self.b[2]
         self.box[2] = self.b[1]
         self.boy = numpy.cross(self.b, self.box)
+
+        # The 3x3 B-matrix converts a (x,y,z) vector on the unit spehre
+        # which is a direction from the observer to the star in alt-az (horizontal)
+        # coordinates (x points East, y to the North and z to the zenith)
+        # into a vector on the unit sphere where the two PW motor angles (and offsets)
+        # play the role of the azimuth and polar angles.
+        # See https://www.mpia.de/~mathar/public/mathar20201208.pdf
+        self.B = numpy.array([[0,0,0],[0,0,0],[0,0,0]],dtype=numpy.double)
+        bproj = math.hypot(self.b[1],self.b[2]) # sqrt(by^2+bz^2)
+        self.B[0][0] = -self.sign*bproj
+        self.B[0][1] = self.sign*self.b[0]*self.b[1]/bproj
+        self.B[0][2] = self.sign*self.b[0]*self.b[2]/bproj
+        self.B[1][0] = 0
+        self.B[1][1] = -self.sign*self.b[2]/bproj
+        self.B[1][2] = self.sign*self.b[1]/bproj
+        self.B[2][0] = self.b[0]
+        self.B[2][1] = self.b[1]
+        self.B[2][2] = self.b[2]
+
+        if isinstance(om1_off_ang, astropy.coordinates.Angle) :
+            self.pw_ax_off = [om1_off_ang.radian, om2_off_ang.radian]
+        else:
+            self.pw_ax_off = [math.radians(om1_off_ang), math.radians(om2_off_ang)]
 
     def fieldAngle(self, site, target, ambi, time=None):
         """
@@ -165,7 +197,7 @@ class Siderostat():
         # print("targNcp", to_north, targNcp.targ)
         # at this point using a positive value of the first paramter (0.16deg) gives
         # a target with larger RA value.
-        # has 
+        # has
         horizNcp = targNcp.toHoriz(site=site, ambi=ambi, time=now)
 
         starNcp = numpy.zeros((3))
@@ -259,13 +291,13 @@ class Siderostat():
 
         :param wd: width of the image in pixels (after binning)
               Can be None if camera has this information
-              This is typically 1600 for the monochrome cameras and 3200 for 
+              This is typically 1600 for the monochrome cameras and 3200 for
               the color camera (binning=1).
         :type wd: int
 
         :param hd: height of the image in pixels (after binning)
               Can be None if camera has this information
-              This is typically 1100 for the monochrome cameras and 2200 for 
+              This is typically 1100 for the monochrome cameras and 2200 for
               the color camera (binning=1).
         :type hd: int
 
@@ -345,13 +377,13 @@ class Siderostat():
         # print("after kmirr",math.degrees(angtmp)," E deg")
         tele='LVMT'
         if ag_cam_name.find('skye') >= 0 :
-           tele +=' skye'
+            tele +=' skye'
         elif ag_cam_name.find('skyw') >= 0 :
             tele +=' skyw'
         elif ag_cam_name.find('sci') >= 0 :
-           tele +=' sci'
+            tele +=' sci'
         elif ag_cam_name.find('spec') >= 0 :
-           tele +=' spec'
+            tele +=' spec'
         key = astropy.io.fits.Card("TELESCOP", tele, "Local Volume Mapper sci, skye, skyw, spec")
         wcshdr.append(key)
 
@@ -374,17 +406,17 @@ class Siderostat():
         is_agw = is_age = is_agc = False
         if ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
             if swap_ew_cams:
-               is_age=True
+                is_age=True
             else :
-               is_agw=True
+                is_agw=True
         elif ag_cam_name.find('east') >= 0 or ag_cam_name.find('age') >= 0:
             if swap_ew_cams:
-               is_agw=True
+                is_agw=True
             else :
-               is_age=True
+                is_age=True
         elif ag_cam_name.find('center') >= 0 or ag_cam_name.find('agc') >= 0:
-               # this is last in the elif-chain because the name may have the substring 'agcam...'
-               is_agc=True
+            # this is last in the elif-chain because the name may have the substring 'agcam...'
+            is_agc=True
         else:
             raise NameError("Unrecognized camera name " + ag_cam_name)
 
@@ -510,7 +542,7 @@ class Siderostat():
         else:
             dist_cam_mid = camera.detector_size.hd / \
                 2 / camera.binning[1] + dist_cam_edge
-    
+
         # where is the center of image away in the pixel coordinate system
         # of the camera? For the x-position this is in the middle of the
         # camera along the long axis because all cameras are installed up-down
@@ -521,7 +553,7 @@ class Siderostat():
         else :
             crpix1 = camera.detector_size.wd / 2 / camera.binning[0] + 0.5
             crpix2 = camera.detector_size.hd / 2 / camera.binning[1] + 0.5
-    
+
         if is_agc :
             # ra/dec in the center of the image
             pass
@@ -577,12 +609,12 @@ class Siderostat():
         xy_to_ad=[[-cosperpix,sinperpix],[sinperpix,cosperpix]]
         if flipCDx :
             # direction of x pixels flipped
-            xy_to_ad[0][0] *= -1 
-            xy_to_ad[1][0] *= -1 
+            xy_to_ad[0][0] *= -1
+            xy_to_ad[1][0] *= -1
         if flipCDy :
             # direction of y pixels flipped
-            xy_to_ad[0][1] *= -1 
-            xy_to_ad[1][1] *= -1 
+            xy_to_ad[0][1] *= -1
+            xy_to_ad[1][1] *= -1
 
         # negative CD determinant for upright images (imgparity=True), because
         # (ra/dec) are a left-handed coordinate system; positive for flipped (imparity=False)
@@ -597,8 +629,8 @@ class Siderostat():
 
         if not imgparity:
             # direction of alpha (i.e. the image) is flipped
-            xy_to_ad[0][0] *= -1 
-            xy_to_ad[0][1] *= -1 
+            xy_to_ad[0][0] *= -1
+            xy_to_ad[0][1] *= -1
 
         key=astropy.io.fits.Card( "CD1_1", xy_to_ad[0][0], "[deg/px] WCS matrix diagonal x->ra")
         wcshdr.append(key)
@@ -617,8 +649,8 @@ class Siderostat():
         key=astropy.io.fits.Card(
             "AZ", horiz.az.deg, "[deg] object azimuth N=0, E=90")
         wcshdr.append(key)
-  
-        # compute the parallactic angle 
+
+        # compute the parallactic angle
         pa = target.parallact(site, ambi, now)
         key=astropy.io.fits.Card("PARANG", pa.deg, "[deg] parallactic angle")
         wcshdr.append(key)
@@ -720,7 +752,7 @@ class Siderostat():
            dist_cam_edge=11.14771) :
         """ Collect the parameters for a second WCS system for focal plane coordinates.
         The primary list of parameters collected in to_header_wcs() convert pixels
-        to RA/DEC coordinates, whereas this set here converts pixels to 
+        to RA/DEC coordinates, whereas this set here converts pixels to
         micrometers in a comman focal plane of the guide cameras and fiber heads.
         The names for this system are ending on 'F' (short for focal plane).
         The main purpose is to have a quick online conversion from guide camera
@@ -751,12 +783,12 @@ class Siderostat():
         :type bin: int
 
         :param wd: width of the image in pixels (after binning)
-              This is typically 1600 for the monochrome cameras and 3200 for 
+              This is typically 1600 for the monochrome cameras and 3200 for
               the color camera (binning=1).
         :type wd: int
 
         :param hd: height of the image in pixels (after binning)
-              This is typically 1100 for the monochrome cameras and 2200 for 
+              This is typically 1100 for the monochrome cameras and 2200 for
               the color camera (binning=1).
         :type hd: int
 
@@ -802,9 +834,9 @@ class Siderostat():
                 flipCDy = not flipCDy
 
         #if is_age or is_agw:
-        #    n_refl = 1 
+        #    n_refl = 1
         #elif is_agc :
-        #    n_refl = 0 
+        #    n_refl = 0
         #else :
         #    raise ValueError("one of age, age, agc must be True ")
 
@@ -836,14 +868,14 @@ class Siderostat():
         # distance from the middle of the east or west camera to fiber ctner in pixels
         # note that hd is already in binned pixels (as in the FITS NAXIS)
         dist_cam_mid = hd / 2 + dist_cam_edge
-    
+
         # where is the center of image away in the pixel coordinate system
         # of the camera? For the x-position this is in the middle of the
         # camera along the long axis because all cameras are installed up-down
         # For age and agw the wd parameters are 1600 and the hd 1100 (not binned).
         crpix1 = wd / 2 + 0.5
         crpix2 = hd / 2 + 0.5
-    
+
         if is_agc :
             # x pixel points up and y-pixel points left
             xy_to_ad=[[0,-pixsize],[pixsize,0]]
@@ -879,12 +911,12 @@ class Siderostat():
 
         if flipCDx :
             # direction of x pixels flipped
-            xy_to_ad[0][0] *= -1 
-            xy_to_ad[1][0] *= -1 
+            xy_to_ad[0][0] *= -1
+            xy_to_ad[1][0] *= -1
         if flipCDy :
             # direction of y pixels flipped
-            xy_to_ad[0][1] *= -1 
-            xy_to_ad[1][1] *= -1 
+            xy_to_ad[0][1] *= -1
+            xy_to_ad[1][1] *= -1
 
         key=astropy.io.fits.Card( "CD1_1"+suff, xy_to_ad[0][0], "[um/px] WCS matrix diagonal x->umHor")
         wcshdr.append(key)
@@ -1039,15 +1071,15 @@ class Siderostat():
         site = Site(name=observat)
 
         # ra and dec in degrees
-        ra = hdr['RA'] 
-        dec = hdr['DEC'] 
+        ra = hdr['RA']
+        dec = hdr['DEC']
         # hack 1: correct the absolutely wrong values of 2022-10-26 for Alcyrone
         # ra=(3+47.0/60.0+29.19/3600.)*15 ;
         # dec= 24+6/60.0+14.8/3600. ;
 
         # horizontal and vertical avariscam flips in the image
-        genrevx = hdr['GENREVX'] 
-        genrevy = hdr['GENREVY'] 
+        genrevx = hdr['GENREVX']
+        genrevy = hdr['GENREVY']
 
         # K-mirror (middle mirror) position angle in degrees
         # The KMIRDROT uses a convnetion where this is apparently
@@ -1122,7 +1154,7 @@ class Siderostat():
         else:
             pixsize=9.0
 
-        wcshdr = self.to_header(site, target, None, ambi, k_mocon_steps, tele + " " + ag_cam_name, 
+        wcshdr = self.to_header(site, target, None, ambi, k_mocon_steps, tele + " " + ag_cam_name,
                 genrevx, genrevy, kmirr, time, pixsize, bin=bin, wd=wd, hd=hd)
         # print(wcshdr)
 
@@ -1130,9 +1162,9 @@ class Siderostat():
             # In this case we want to create a new not yet existing FITS file
             # copy the data/image to a new HDU
             hduout = astropy.io.fits.PrimaryHDU(hdu[0].data)
-    
+
             # copy also the header.
-            # Need copy() here, otherwise the update() further down will refuse to replace 
+            # Need copy() here, otherwise the update() further down will refuse to replace
             # the old CD values which are in the old FITS file.
             hduout.header = hdu[0].header.copy()
             hduout.header.update(wcshdr,unique=True)
@@ -1420,6 +1452,178 @@ class Siderostat():
             moc.append([0, 0, round(rads[-1]), 0, 0])
 
         return moc
+
+    def _off_norm2(self, offom1, offom2, motang, signom1= -1, signom2= -1):
+        """ Compute a deviation of calculated and measured PW motor angle.
+        :param offom1: offset (zero point) for M1 motor axis (radians)
+        :param offom2: offset (zero point) for M2 motor axis (radians)
+        :param motang: [0]=motor angle ax0 [1]=motor angle ax1 [2]=azimuth [3]=altitude (degrees)
+        :param signom1: +1 turns in direction of manuscript, else -1 opposite
+        :param signom2: +1 turns in direction of manuscript, else -1 opposite
+              Heuristics shows that these must be -1 as of 2022-12-12 tests.
+              Which means we assume that the PW motor angles are measuring
+              c.c.w.
+        """
+        # extract motor angles and assumed offsets
+        # omega_2 of the manuscript is mot0 in PW and omega_1 is mot1 in PW
+        om1 = math.radians(motang[1])-offom1
+        om2 = math.radians(motang[0])-offom2
+        om1 *= signom1
+        om2 *= signom2
+
+        # left hand side equ (39), vector of the motor angles
+        # as measured with assumed offset
+        om_mot = numpy.zeros((3))
+        om_mot[0] = math.cos(om2)*math.sin(om1)
+        om_mot[1] = math.sin(om2)*math.sin(om1)
+        om_mot[2] = math.cos(om1)
+
+        # extract azimuth and zenith distance from arguments
+        az = math.radians(motang[2])
+
+        # extract zenith distance, 90 deg comlemeent of altitude
+        Z = math.radians(90-motang[3])
+
+        # right hand side equ (39), vector of the sky coordinates.
+        aa = numpy.zeros((3))
+        aa[0] = math.sin(az)*math.sin(Z)
+        aa[1] = math.cos(az)*math.sin(Z)
+        aa[2] = math.cos(Z)
+        # computed/predicted left hand side by 3x3 matrix multiplication
+        om = numpy.dot(self.B, aa)
+        # return a distance between the computed and measured Cartesian directions
+        return numpy.linalg.norm(om_mot- om)
+
+    def _off_sum(self, offom1, offom2, motang):
+        """ Accumulate over all measured entries in motang the squared
+            distance between predicted and computed motor angle (vector)
+        :param offom1: offset (zero point) for first motor axis (radians)
+        :type offom1: float
+        :param offom2: offset (zero point) for second motor axis (radians)
+        :type offom2: float
+        :param motang: list of 4-tuples
+                       [0]=PW angle ax0 [1]=PW angle ax1 [2]=azimuth [3]=altitude (degrees)
+        :return: a figure of merit to be minimised to find the best offom1 and offom2
+        :rtype: float
+        """
+        off = 0.0
+        for i in range(len(motang)):
+            off += self._off_norm2(offom1,offom2, motang[i])
+        return off
+
+    def find_off(self, motang) :
+        """ Find a pair of motor offsets of the PW motors.
+        The task of this routine is to find a pair of offset angles
+        as provided in the _init__ function which matches PW motor axis
+        angles to the right-handed angles defined in the paper of the imperfect K-mirrors.
+        :param motang:
+
+        This is a list of PW motor angles (ax0 and ax1) and associated
+        azimuth and altitude angles, all 4 values in degrees.
+        The 4 value should be read off the PW GUI at the same time;
+        it is not required that any actual star is observed and this
+        should be done with zero offsets in the interface and tracking
+        disabled (so the motor angles and horizontal coordinates are fixed.)
+        The list has as many 4-tuples as motor and sky coordinates noted down;
+        For fitting purposes of the motor angle offsets there ought to be
+        at least 2 4-tuples in that list of lists.
+        Example test case here is of the 2022-12-12 observations at the MPIA:
+        motang = [ [101.5, 54.29,176+54/60.0+34/3600.0, 64+40/60.0+49/3600.0],
+            [88.23, 19.44, 308+52/60.0+37.0/3600.0, 74+42/60.0+19.3/3600.0],
+            [163.60, 28.87,89+55/60.0+3.8/3600.0, 26+40/60.0+51.5/3600.0] ]
+        :type motang: list of 4-tuples of numbers
+
+        :return: two angles in degrees which can be used as om_1_off_ang
+                 and om2_off_ang to have a calibrated routine for generating PW motor
+                 angles from alt-az angles.
+        """
+        # a pessimistic starting estimate of the best fit: each value misses by 2*pi
+        # the aim of this fitting routine is to get a pair of offsets
+        # such that this value becomes almost zero (up to jitter....)
+        min_sqr = 6.*len(motang)
+
+        # start with random assumption that both offsets are zero.
+        # better_offi are the values found in 4 iterations, and
+        # best_offi are the angles/values that are so far globally the best
+        better_off1 = better_off2 = 0
+        best_off1 = best_off2 = 0
+
+        # the search range of the grid of testing offsets is 360 degrees
+        # in both angles (as wide as possible)
+        off_range = 2.*math.pi
+
+        # In 4 iterations start with a coarse grid and zoom into the
+        # region around the best angles found so far to find a global minimum
+        for itr in range(4):
+            # subdivide the search range of the angles into
+            # 30 samples
+            off_step = off_range/30.0
+            # in an outer loop for the offset of omega1 and
+            # an inner loop for the offset of omega2 get a deviation
+            # from the observed value at each subsampled point by
+            # calling _off_sum.
+            for idx1 in range(30):
+                offom1 = best_off1 + (idx1-15)*off_step
+                for idx2 in range(30):
+                    offom2 = best_off2 + (idx2-15)*off_step
+                    this_sqr = self._off_sum(offom1, offom2, motang)
+                    if this_sqr < min_sqr :
+                        # if this pair of offsets produced a better fit,
+                        # remember which angles these were and what their
+                        # deviation from the hitherto best fit was.
+                        better_off1 = offom1
+                        better_off2 = offom2
+                        min_sqr = this_sqr
+
+            # new pivotal middel of the next iteration are the
+            # angles that reached the minimum deviation
+            best_off1 = better_off1
+            best_off2 = better_off2
+            # print(best_off1,best_off2,min_sqr) # debugging to print progress
+            # shrink the search range of the two angles by a factor of 20
+            # (so they are slightly larger than the factor of30 to catch
+            # cases where the minima are on boundaries of the subintervals)
+            off_range /= 20.0
+        return math.degrees(best_off1), math.degrees(best_off2)
+
+    def to_pw_motang(self,horiz):
+        """ Compute PW motor angles given altitude and azimuth of the sky.
+        :param horiz: the alt/az of the pointing center
+        :type horiz: astropy.coordinates.AltAz
+        :return: a pair of motor angles, ax0,ax1 in degrees
+        :rtype: float
+        """
+
+        # generate a vector representation of the pointing
+        # exactly as in _off_norm2()
+
+        # extract azimuth and zenith distance in radians
+        az = horiz.az.radian
+        Z = math.pi/2 - horiz.alt.radian
+
+        # right hand side equ (39), vector of the sky coordinates.
+        aa = numpy.zeros((3))
+        aa[0] = math.sin(az)*math.sin(Z)
+        aa[1] = math.cos(az)*math.sin(Z)
+        aa[2] = math.cos(Z)
+        # computed/predicted left hand side by 3x3 matrix multiplication
+        om = numpy.dot(self.B, aa)
+        # convert the vector (cos(omega2)sin(omega1), sin(omega2)sin(omega1)..
+        # back to ax0 and ax1 with the offsets
+        om1 = math.acos(om[2])
+        om[0] /= math.sin(om1)
+        om[1] /= math.sin(om1)
+        om2 = math.atan2(om[1],om[0])
+
+        # this reverses the two signs (handedness) of the motor axes
+        om1 *= -1
+        om2 *= -1
+        om1 += self.pw_ax_off[0]
+        om2 += self.pw_ax_off[1]
+        # normalize both angles to 0..360 deg
+        om1 = (om1 + 2*math.pi) % (2*math.pi)
+        om2 = (om2 + 2*math.pi) % (2*math.pi)
+        return math.degrees(om2), math.degrees(om1)
 
     def nearby_target(self, t, m2=[0, 0, 0]):
         '''

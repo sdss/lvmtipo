@@ -82,6 +82,9 @@ class Wcsarith():
             the self system. Note that such a mapping of pixels to pixels will also 
             include any errors of the pointing model assumed in the WCS(s), not just geometric
             distortions that follow from imperfect alignments of camera chips.
+            A potential application could be a guider that has obtained for two
+            images two WCS maps and wants to convert the "difference" in these two
+            maps to a transformation between pixels.
         :return: an Affine2d object which correlates the two maps in their image coordinates.
         :rtype: lvmtipo.Affine2d
         """
