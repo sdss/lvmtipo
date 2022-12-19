@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-11-15
+# @Date: 2022-12-19
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -24,6 +24,7 @@ from lvmtipo.kmirror import Kmirror
 from lvmtipo.fiber import Fiber
 from lvmtipo.site import Site
 from lvmtipo.ambient import Ambient
+from lvmtipo.wcsarith import Wcsarith
 
 __all__ = ['Siderostat']
 
@@ -1455,6 +1456,9 @@ class Siderostat():
 
     def _off_norm2(self, offom1, offom2, motang, signom1= -1, signom2= -1):
         """ Compute a deviation of calculated and measured PW motor angle.
+        This is basically the function which defines what is to be minimized
+        while searching for best fitting PW motor angle offsets in find_pw_ax_off().
+
         :param offom1: offset (zero point) for M1 motor axis (radians)
         :param offom2: offset (zero point) for M2 motor axis (radians)
         :param motang: [0]=motor angle ax0 [1]=motor angle ax1 [2]=azimuth [3]=altitude (degrees)
@@ -1511,11 +1515,12 @@ class Siderostat():
             off += self._off_norm2(offom1,offom2, motang[i])
         return off
 
-    def find_off(self, motang) :
+    def find_pw_ax_off(self, motang) :
         """ Find a pair of motor offsets of the PW motors.
-        The task of this routine is to find a pair of offset angles
-        as provided in the _init__ function which matches PW motor axis
+        The task of this calibration routine is to find a pair of offset angles
+        to be fed into the __init__ function which matches PW motor axis
         angles to the right-handed angles defined in the paper of the imperfect K-mirrors.
+
         :param motang:
 
         This is a list of PW motor angles (ax0 and ax1) and associated
@@ -1586,11 +1591,18 @@ class Siderostat():
             off_range /= 20.0
         return math.degrees(best_off1), math.degrees(best_off2)
 
-    def to_pw_motang(self,horiz):
+    def alt_az_to_pw_motang(self,horiz):
         """ Compute PW motor angles given altitude and azimuth of the sky.
-        :param horiz: the alt/az of the pointing center
+        The (x,y,z) components of a unit vector that is defined by using the two
+        PW motor angles in a polar coordinate system is given by multiplying
+        the 3x3 matrix self.B by the unit vector that is defined by the (x,y,z)
+        components of the topocentric horizontal coordinate system of the
+        alt/az direction to the star.
+
+        :param horiz: the alt/az of the target
         :type horiz: astropy.coordinates.AltAz
-        :return: a pair of motor angles, ax0,ax1 in degrees
+
+        :return: a pair of PW motor angles, ax0, ax1 in degrees
         :rtype: float
         """
 
@@ -1616,6 +1628,7 @@ class Siderostat():
         om2 = math.atan2(om[1],om[0])
 
         # this reverses the two signs (handedness) of the motor axes
+        # compatible with _off_norm2(). This here operates what's there in reverse order.
         om1 *= -1
         om2 *= -1
         om1 += self.pw_ax_off[0]
@@ -1624,6 +1637,107 @@ class Siderostat():
         om1 = (om1 + 2*math.pi) % (2*math.pi)
         om2 = (om2 + 2*math.pi) % (2*math.pi)
         return math.degrees(om2), math.degrees(om1)
+
+    def guide_wcs_to_pw_motang(self,wcs_ref, wcs_current, site, ambi=None, time=None):
+        """ Convert a WCS pair of the guider to a pair of PW motor angle offsets
+        Example:
+        >>> fits_inr="/home/mathar/lvm.spec.agcam.center_00000051.fits"
+        >>> f_inr = astropy.io.fits.open(fits_inr)
+        >>> wcs_inr =  astropy.wcs.WCS(f_inr[0].header)
+        >>> fits_inc= "/home/mathar/lvm.spec.agcam.center_00000052.fits"
+        >>> f_inc = astropy.io.fits.open(fits_inc)
+        >>> wcs_inc =  astropy.wcs.WCS(f_inc[0].header)
+        >>> sid=Siderostat(azang=180.0)
+        >>> site = Site(name='MPIA')
+        >>> ax = sid.guide_wcs_to_pw_motang(wcs_inr,wcs_inc,site)
+        >>> print(ax)
+
+        :param wcs_ref: the WCS map where the stars should be.
+           This is typically obtained by astrometry at the start of the exposure.
+        :type wcs_ref: astropy.wcs.WCS
+
+        :param wcs_current: the WCS map where the stars currently are.
+           This is typically obtained in a loop while exposing.
+        :type wcs_current: astropy.wcs.WCS
+
+        :param site: geographic ITRF location of the observatory
+        :type site: lvmtipo.Site
+
+        :param ambi: Ambient data relevant for refractive index
+        :type ambi: lvmtipo.Ambient
+
+        :param time: time of wcs_current either as astropy.time.Time
+             or a string in ISO format/UTC; if None, the current time will be used.
+        :type time:
+
+        :return: a 2-uple of PW differential motor angles (offsets) for ax0, ax1 in degrees.
+            These ought to pull the angles such that the forthcoming WCS
+            matches the wcs_ref.
+        :rtype: float
+
+        """
+
+        # first step is to get the affine transformation that
+        # transforms pixels from one WCS to the other.
+        aff_ref = Wcsarith(wcs_ref)
+        aff_current = Wcsarith(wcs_current)
+        # the affine transwformation that transforms pixels in the current 
+        # WCS to pixels in the reference WCS. pixref= W^(-1)ref * W(current)*pixcur
+        aff = aff_current / aff_ref
+        # print(str(aff)) # debugging
+
+        # we ignore the rotational aspect and use only the shift/translate
+        # result aff.shift[0,1]. The rotational aspect in aff.rot would only play a role
+        # if one would try to update the K-mirror velocities....
+        # The following is basically the same as Wcsarith.offset_px_to_azalt().
+
+        # compute where the reference equatorial ra/dec are
+        radec = wcs_ref.all_pix2world([0.],[0.],1,ra_dec_order=True)
+        object = astropy.coordinates.SkyCoord(ra=radec[0], dec=radec[1],unit="deg")
+        targ_ref = Target(object)
+
+        # compute where the current  equatorial ra/dec are
+        # Note that this is using wcs_ref again, not wcs_current.
+        radec = wcs_ref.all_pix2world([aff.shift[0]],[aff.shift[1]],1,ra_dec_order=True)
+        object = astropy.coordinates.SkyCoord(ra=radec[0], dec=radec[1],unit="deg")
+        targ_current = Target(object)
+
+        if isinstance(time, astropy.time.Time):
+            now = time
+        elif isinstance(time, str):
+            now = astropy.time.Time(time, format='isot', scale='utc')
+        elif time is None:
+            now = astropy.time.Time.now()
+
+        if isinstance(site, Site):
+            if ambi is None:
+                refr = Ambient(site=site)
+            elif isinstance(ambi, Ambient):
+                refr = ambi
+            else:
+                raise TypeError("invalid ambi data type")
+            earthloc = site.toEarthLocation()
+        else:
+            raise TypeError("invalid site  data type")
+
+        # compute where the reference pixels are in alt/az 
+        aa_ref = targ_ref.toHoriz(site,ambi=ambi,time=now)
+
+        # compute where the current pixels are in alt/az 
+        aa_current = targ_current.toHoriz(site,ambi=ambi,time=now)
+
+        #compute where the reference pixels are in PWI angles
+        pw_ax_ref = self.alt_az_to_pw_motang(aa_ref)
+
+        #compute where the current pixels are in PWI angles
+        pw_ax_current = self.alt_az_to_pw_motang(aa_current)
+        # print(pw_ax_ref, pw_ax_current) # debugging
+
+        # to be checked: is this the subtraction with the correct sign/order???
+        # or do we need to subtract ref from current?
+        delta_ax0 = pw_ax_ref[0] - pw_ax_current[0]
+        delta_ax1 = pw_ax_ref[1] - pw_ax_current[1] 
+        return delta_ax0, delta_ax1
 
     def nearby_target(self, t, m2=[0, 0, 0]):
         '''
