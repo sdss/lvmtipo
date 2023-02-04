@@ -2,7 +2,7 @@
 #
 # @Author: Florian Briegel (briegel@mpia.de)
 # @Date: 2021-08-18
-# @Filename: lvm/actors.py
+# @Filename: actors.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
 
@@ -17,7 +17,9 @@ class lvm:
     ieb = Proxy("lvmieb")
     ecp = Proxy("lvmecp")
     scp = Proxy("lvmscp")
-    scraper = Proxy("lvm.scraper")
+#    scraper = Proxy("lvm.scraper")
+    tel = Proxy("lvm.tel")
+
 
     class sci:
         foc = Proxy("lvm.sci.foc")
