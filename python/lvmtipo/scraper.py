@@ -15,6 +15,51 @@ from cluplus.proxy import flatten, Client
 
 
 class ScraperDataStore(object):
+    """
+    Scrapers data store initialized with a dictofdicts or yaml
+
+    config =
+           {'lvm.sci.pwi':
+                {'ra_j2000_hours': 'sci:ra_j2000_h',
+                 'dec_j2000_degs': 'sci:dec_j2000_d',
+                 'altitude_degs': 'sci:altitude_d',
+                 'azimuth_degs': 'sci:azimuth_d'},
+            'lvm.sci.foc':
+                {'Position': 'sci:foc_dt'},
+            'lvm.sci.km':
+                {'Position': 'sci:km_d', 'SkyPA': 'sci:sky_d'},
+            'lvm.tel':
+                {'temperature': 'bentemp',
+                 'humidity': 'benhum',
+                 'pressure': 'benpress'},
+            'lvm.sci.agcam':
+                {'east.temperature': 'sci:east.temp',
+                 'east.filename': 'sci:east.file',
+                 'west.temperature': 'sci:west.temp',
+                 'west.filename': 'sci:west.file',
+                 'center.temperature': 'sci:center.temp',
+                 'center.filename': 'sci:center.file'}}
+
+      # or
+        import yaml
+
+        config = "
+        lvm.foc:
+            Position: foc_dt
+
+        lvm.km:
+            Position: km_d
+            SkyPA: sky_d
+
+        lvm.tel:
+            temperature: bentemp
+            humidity: benhum
+            pressure: benpress
+        "
+        yaml.safe_load(config_string)
+
+    """
+
     def __init__(self, config={}):
         self.actor_key_maps = config
         self.data = {}
@@ -58,6 +103,7 @@ class ScraperDataStore(object):
 
 
 class Scraper(Client):
+    """ Scraper listening for actor messages """
 
     def __init__(
         self,
