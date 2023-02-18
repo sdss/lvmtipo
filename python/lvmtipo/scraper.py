@@ -6,12 +6,14 @@
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
 import asyncio
+import json
+from typing import Callable, Optional
 
 from datetime import datetime as dt
 import aio_pika as apika
 
-from clu.client import AMQPClient, AMQPReply
-from cluplus.proxy import flatten, Client
+from clu.client import AMQPClient, AMQPReply, CommandStatus
+from cluplus.proxy import Client, ProxyDict, unpack, flatten
 
 
 class ScraperDataStore(object):
@@ -108,11 +110,14 @@ class Scraper(Client):
     def __init__(
         self,
         scraper:dict,
+        callback: Optional[Callable[[ProxyDict], None]] = None,
         **kwargs
     ):
 
         super().__init__(**kwargs)
+
         self.scraper_store = ScraperDataStore(scraper)
+        self.callback = callback
 
     async def handle_reply(self, message: apika.IncomingMessage) -> AMQPReply:
         """Handles a reply received from the exchange.
@@ -121,6 +126,13 @@ class Scraper(Client):
         if reply.sender in self.scraper_store.actors() and reply.headers.get("message_code", None) in ":i":
             timestamp = apika.message.decode_timestamp(message.timestamp) if message.timestamp else datetime.utcnow()
             self.scraper_store.update_with_actor_key_maps(reply.sender, flatten(reply.body), timestamp)
+
+            if self.callback:
+                msg = ProxyDict(json.loads(reply.message.body))
+                msg.sender = reply.sender
+                msg.command_status = CommandStatus.code_to_status(reply.message_code)
+                msg.timestamp = timestamp
+                self.callback(msg)
 
         return reply
 
