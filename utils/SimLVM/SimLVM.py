@@ -1073,7 +1073,7 @@ class AppWin(QtWidgets.QMainWindow):
         if "pwi" in data.sender:
             print(f" {data.timestamp} ra, dec {data.unpack('ra_j2000_hours', 'dec_j2000_degs')}")
         elif "agcam" in data.sender and data.command_status == CommandStatus.DONE:
-            print(f" {data.timestamp} {data.flatten().unpack('*.filenames')}")
+            print(f" {data.timestamp} {data.flatten().unpack('*.filename')}")
 
 
 ######################## MAIN APPLICATION LOOP #########################
