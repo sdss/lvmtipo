@@ -1,12 +1,14 @@
-from astropy.coordinates import EarthLocation
+from datetime import datetime
+from math import nan, cos
+import numpy as np
+
+from astropy.coordinates import EarthLocation, SkyCoord, Angle
 from astropy.time import Time
 from astropy import units as u
 
-from datetime import datetime
-from math import nan, cos
-
 from .ambient import Ambient
 from .site import Site
+from .siderostat import Siderostat
 
 
 def radec2azel(raD, decD, lstD, site: Site):
