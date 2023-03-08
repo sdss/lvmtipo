@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sdss-lvmtipo"
-version = "0.0.35"
+version = "0.0.36"
 description = "Additional functionality for sdss-clu"
 authors = ["Florian Briegel <briegel@mpia.de>"]
 license = "BSD-3-Clause"
@@ -28,7 +28,7 @@ include = ["python/lvmtipo/etc/*"]
 fieldrot = "lvmtipo.fieldrot.__main__:main"
 
 [tool.poetry.dependencies]
-python = ">=3.7,<4"
+python = ">=3.8,<4"
 click-default-group = "^1.2.2"
 daemonocle = "^1.1.1"
 sdss-tree = ">=2.15.2"
