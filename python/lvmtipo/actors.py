@@ -10,7 +10,7 @@ import asyncio
 from typing import Union
 
 from cluplus.proxy import Proxy, invoke, unpack, flatten
-
+from clu import BaseClient
 
 class lvm:
     nps = Proxy("lvmnps")
@@ -28,13 +28,13 @@ class lvm:
         agc = Proxy("lvm.sci.agcam")
         ag = Proxy("lvm.sci.ag")
 
-        async def start():
+        async def start(amqpc:BaseClient = None):
             await asyncio.gather(
-                lvm.sci.foc.start(),
-                lvm.sci.km.start(),
-                lvm.sci.pwi.start(),
-                lvm.sci.agc.start(),
-                lvm.sci.ag.start(),
+                lvm.sci.foc.start(amqpc),
+                lvm.sci.km.start(amqpc),
+                lvm.sci.pwi.start(amqpc),
+                lvm.sci.agc.start(amqpc),
+                lvm.sci.ag.start(amqpc),
                 return_exceptions=True
             )
             return lvm.sci
@@ -46,13 +46,13 @@ class lvm:
         agc = Proxy("lvm.skye.agcam")
         ag = Proxy("lvm.skye.ag")
         
-        async def start():
+        async def start(amqpc:BaseClient = None):
             await asyncio.gather(
-                lvm.skye.foc.start(),
-                lvm.skye.km.start(),
-                lvm.skye.pwi.start(),
-                lvm.skye.agc.start(),
-                lvm.skye.ag.start(),
+                lvm.skye.foc.start(amqpc),
+                lvm.skye.km.start(amqpc),
+                lvm.skye.pwi.start(amqpc),
+                lvm.skye.agc.start(amqpc),
+                lvm.skye.ag.start(amqpc),
                 return_exceptions=True
             )
             return lvm.skye
@@ -63,13 +63,13 @@ class lvm:
         pwi = Proxy("lvm.skyw.pwi")
         agc = Proxy("lvm.skyw.agcam")
         ag = Proxy("lvm.skyw.ag")
-        async def start():
+        async def start(amqpc:BaseClient = None):
             await asyncio.gather(
-                lvm.skyw.foc.start(),
-                lvm.skyw.km.start(),
-                lvm.skyw.pwi.start(),
-                lvm.skyw.agc.start(),
-                lvm.skyw.ag.start(),
+                lvm.skyw.foc.start(amqpc),
+                lvm.skyw.km.start(amqpc),
+                lvm.skyw.pwi.start(amqpc),
+                lvm.skyw.agc.start(amqpc),
+                lvm.skyw.ag.start(amqpc),
                 return_exceptions=True
             )
             return lvm.skyw
@@ -80,13 +80,13 @@ class lvm:
         pwi = Proxy("lvm.spec.pwi")
         agc = Proxy("lvm.spec.agcam")
         ag = Proxy("lvm.spec.ag")
-        async def start():
+        async def start(amqpc:BaseClient = None):
             await asyncio.gather(
-                lvm.spec.foc.start(),
-                lvm.spec.fibsel.start(),
-                lvm.spec.pwi.start(),
-                lvm.spec.agc.start(),
-                lvm.spec.ag.start(),
+                lvm.spec.foc.start(amqpc),
+                lvm.spec.fibsel.start(amqpc),
+                lvm.spec.pwi.start(amqpc),
+                lvm.spec.agc.start(amqpc),
+                lvm.spec.ag.start(amqpc),
                 return_exceptions=True
             )
             return lvm.spec
