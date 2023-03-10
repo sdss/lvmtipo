@@ -60,6 +60,31 @@ class ScraperDataStore(object):
         "
         yaml.safe_load(config_string)
 
+        # or not storing data, only for callback usage
+        config = "
+        lvm.sci.ag: null
+        "
+
+        # or with a lambda funktion
+        tel="sci"
+
+        config = lambda tel: f"
+        lvm.{tel}.foc:
+            Position: foc_dt
+
+        lvm.{tel}.km:
+            Position: km_d
+            SkyPA: sky_d
+
+        lvm.{tel}.tel:
+            temperature: bentemp
+            humidity: benhum
+            pressure: benpress
+
+        lvm.{tel}.ag0: null
+        "
+        yaml.safe_load(config(tel))
+
     """
 
     def __init__(self, config={}):
@@ -98,7 +123,8 @@ class ScraperDataStore(object):
 
     def update_with_actor_key_maps(self, actor, data:dict, timestamp=dt.utcnow()):
         akm = self.actor_key_maps.get(actor, None)
-        self.data.update({akm[k]:(v, timestamp) for k, v in data.items() if k in akm.keys()})
+        if isinstance(akm, dict):
+            self.data.update({akm[k]:(v, timestamp) for k, v in data.items() if k in akm.keys()})
 
     def items(self):
         return self.data.items()
@@ -109,12 +135,13 @@ class Scraper(Client):
 
     def __init__(
         self,
-        scraper:dict,
+        scraper: dict,
         callback: Optional[Callable[[ProxyDict], None]] = None,
         **kwargs
     ):
 
         super().__init__(**kwargs)
+
 
         self.scraper_store = ScraperDataStore(scraper)
         self.callback = callback
