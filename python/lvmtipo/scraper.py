@@ -151,7 +151,6 @@ class Scraper(Client):
         """
         reply = await super().handle_reply(message)
 
-#        reply = AMQPReply(message, log=self.log)
         if reply.sender in self.scraper_store.actors() and reply.headers.get("message_code", None) in ":i":
             timestamp = apika.message.decode_timestamp(message.timestamp) if message.timestamp else datetime.utcnow()
             self.scraper_store.update_with_actor_key_maps(reply.sender, flatten(reply.body), timestamp)
