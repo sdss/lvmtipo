@@ -19,6 +19,7 @@ def radec2azel(raD, decD, lstD, site: Site):
             Inputs: ra,dec   - Right Ascension and Declination in decimal degrees
                     lst      - Local Sideral Time in decimal degrees
             Returns:  az,el  - Azimuth and Elevation (Altitude) in decimal degrees
+        DO NOT USE IN PRODUCTION because this ignores all nutation, precession, refraction effects!!
     '''
     lat_r = np.radians(site.lat)
     

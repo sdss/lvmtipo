@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # @Author: Richard J. Mathar <mathar@mpia.de>
-# @Date: 2022-12-19
+# @Date: 2023-05-11
 # @Filename: siderostat.py
 # @License: BSD 3-clause (http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -10,8 +10,8 @@ Python3 class for siderostat field angles using homogeneous coordinates
 """
 
 import math
-import numpy
 import datetime
+import numpy
 import astropy.coordinates
 import astropy.time
 import astropy.units
@@ -263,6 +263,8 @@ class Siderostat():
              both with respect to sign and with respect to mechanical vs
              optical angles.
              If kmirr=None this parameter is not used.
+             If the value is < 0 and this is not the spec bench, no
+             WCS is computed to avoid misinterpretation of the results.
         :type k_mocon_steps: int
 
         :param ag_cam_name: The telescope (skye, skyw, spec, sci) and camera
@@ -348,6 +350,20 @@ class Siderostat():
         # the camera (which uses upper case for some letter).
         ag_cam_name = ag_cam_name.lower()
 
+        tele='LVMT'
+        if ag_cam_name.find('skye') >= 0 :
+            tele +=' skye'
+        elif ag_cam_name.find('skyw') >= 0 :
+            tele +=' skyw'
+        elif ag_cam_name.find('sci') >= 0 :
+            tele +=' sci'
+        elif ag_cam_name.find('spec') >= 0 :
+            tele +=' spec'
+        key = astropy.io.fits.Card("TELESCOP", tele, "Local Volume Mapper sci, skye, skyw, spec")
+        wcshdr.append(key)
+
+        # print(tele)
+
         # three LVMT benches have a K-mirror, one has not
         # Calculate the position angle after (any) K-mirror
         if kmirr is None:
@@ -376,33 +392,22 @@ class Siderostat():
         # is 90 deg smaller, ie. they are left from the targets for N targets.
         # print("after kmirr",math.degrees(ang)," N deg")
         # print("after kmirr",math.degrees(angtmp)," E deg")
-        tele='LVMT'
-        if ag_cam_name.find('skye') >= 0 :
-            tele +=' skye'
-        elif ag_cam_name.find('skyw') >= 0 :
-            tele +=' skyw'
-        elif ag_cam_name.find('sci') >= 0 :
-            tele +=' sci'
-        elif ag_cam_name.find('spec') >= 0 :
-            tele +=' spec'
-        key = astropy.io.fits.Card("TELESCOP", tele, "Local Volume Mapper sci, skye, skyw, spec")
-        wcshdr.append(key)
 
-        # print(tele)
-        # patch error in camera names (S/N assignments )before 2022-11-20.
-        # This block of code should be removed to increase efficiency at some time in the future
-        patchTime2 = astropy.time.Time('2022-11-20T00:00:00',format='isot',scale='tai')
-        # positive if patched/corrected, i.e., after patchTime2
-        sinceTime2 = now - patchTime2
-        if sinceTime2.to_value('jd') < 0:
-            # in the early configuration files the data streams of the east
-            # and west cameras at MPIA were wrong/swapped
-            # This occurs if the IP addresses (in configuration and static dhcp)
-            # are wrong so the 16-bit-byte-streams of the east camera appear here
-            # as the west camera and vice versa.
-            swap_ew_cams = True
-        else:
-            swap_ew_cams = False
+        ## patch error in camera names (S/N assignments )before 2022-11-20.
+        ## This block of code should be removed to increase efficiency at some time in the future
+        #patchTime2 = astropy.time.Time('2022-11-20T00:00:00',format='isot',scale='tai')
+        ## positive if patched/corrected, i.e., after patchTime2
+        #sinceTime2 = now - patchTime2
+        #if sinceTime2.to_value('jd') < 0:
+        #    # in the early configuration files the data streams of the east
+        #    # and west cameras at MPIA were wrong/swapped
+        #    # This occurs if the IP addresses (in configuration and static dhcp)
+        #    # are wrong so the 16-bit-byte-streams of the east camera appear here
+        #    # as the west camera and vice versa.
+        #    swap_ew_cams = True
+        #else:
+        #    swap_ew_cams = False
+        swap_ew_cams = False
 
         is_agw = is_age = is_agc = False
         if ag_cam_name.find('west') >= 0 or ag_cam_name.find('agw') >= 0:
@@ -420,6 +425,17 @@ class Siderostat():
             is_agc=True
         else:
             raise NameError("Unrecognized camera name " + ag_cam_name)
+
+        if is_agc :
+            tele += '.agc'
+        elif is_agw :
+            tele += '.agw'
+        elif is_age :
+            tele += '.age'
+        else:
+            tele += '.'
+        key = astropy.io.fits.Card("CAMERA", tele, " AG camera age, agw, agc on the bench")
+        wcshdr.append(key)
 
         # since the camera has already performed internally one
         # flip around the long axis assuming there is a single lens
@@ -467,17 +483,6 @@ class Siderostat():
             # angle where the reference "left" or "to the west"
             # (passive rotation)
             ang += math.pi/2.0
-
-        if is_agc :
-            tele += '.agc'
-        elif is_agw :
-            tele += '.agw'
-        elif is_age :
-            tele += '.age'
-        else:
-            tele += '.'
-        key = astropy.io.fits.Card("CAMERA", tele, " AG camera age, agw, agc on the bench")
-        wcshdr.append(key)
         # print(tele,"on chip",math.degrees(ang),"deg")
 
         # up to here ang is refering to the short-edge-up orientation
@@ -509,24 +514,25 @@ class Siderostat():
         # print(tele,"with flips",math.degrees(ang),"deg")
         # print(tele,"flipCDx",flipCDx,"flipCDy",flipCDy)
 
-        # add the main pointing keywords
-        key = astropy.io.fits.Card("CUNIT1", "deg", "WCS units along axis 1")
-        wcshdr.append(key)
-        key = astropy.io.fits.Card("CUNIT2", "deg", "WCS units along axis 2")
-        wcshdr.append(key)
-        key = astropy.io.fits.Card("CTYPE1", "RA---TAN", "WCS type axis 1")
-        wcshdr.append(key)
-        key = astropy.io.fits.Card("CTYPE2", "DEC--TAN", "WCS type axis 2")
-        wcshdr.append(key)
-
-        hexrep = target.targ.ra.to_string(unit=astropy.units.hour,precision=2)
-        key = astropy.io.fits.Card(
-            "CRVAL1", target.targ.ra.degree, "[deg] RA ref pixel " + hexrep)
-        wcshdr.append(key)
-        hexrep = target.targ.dec.to_string(unit=astropy.units.degree,precision=2)
-        key = astropy.io.fits.Card(
-            "CRVAL2", target.targ.dec.degree, "[deg] Dec ref pixel " + hexrep)
-        wcshdr.append(key)
+        if kmirr is None or k_mocon_steps > 0 :
+            # add the main pointing keywords if kmirror status is known
+            key = astropy.io.fits.Card("CUNIT1", "deg", "WCS units along axis 1")
+            wcshdr.append(key)
+            key = astropy.io.fits.Card("CUNIT2", "deg", "WCS units along axis 2")
+            wcshdr.append(key)
+            key = astropy.io.fits.Card("CTYPE1", "RA---TAN", "WCS type axis 1")
+            wcshdr.append(key)
+            key = astropy.io.fits.Card("CTYPE2", "DEC--TAN", "WCS type axis 2")
+            wcshdr.append(key)
+   
+            hexrep = target.targ.ra.to_string(unit=astropy.units.hour,precision=2)
+            key = astropy.io.fits.Card(
+                "CRVAL1", target.targ.ra.degree, "[deg] RA ref pixel " + hexrep)
+            wcshdr.append(key)
+            hexrep = target.targ.dec.to_string(unit=astropy.units.degree,precision=2)
+            key = astropy.io.fits.Card(
+                "CRVAL2", target.targ.dec.degree, "[deg] Dec ref pixel " + hexrep)
+            wcshdr.append(key)
 
         # convert disgtcamEdgeCtr from mm to micron and then to pixels
         # This is the distance from the long edge that is narrowest to
@@ -575,10 +581,11 @@ class Siderostat():
             else:
                 crpix2 += dist_cam_mid
 
-        key=astropy.io.fits.Card( "CRPIX1", crpix1, "[px] point cntr along axis 1")
-        wcshdr.append(key)
-        key=astropy.io.fits.Card( "CRPIX2", crpix2, "[px] point cntr along axis 2")
-        wcshdr.append(key)
+        if kmirr is None or k_mocon_steps > 0 :
+            key=astropy.io.fits.Card( "CRPIX1", crpix1, "[px] point cntr along axis 1")
+            wcshdr.append(key)
+            key=astropy.io.fits.Card( "CRPIX2", crpix2, "[px] point cntr along axis 2")
+            wcshdr.append(key)
 
         # the two main values in the CD matrix, irrespective of sign
         if camera is None:
@@ -633,14 +640,16 @@ class Siderostat():
             xy_to_ad[0][0] *= -1
             xy_to_ad[0][1] *= -1
 
-        key=astropy.io.fits.Card( "CD1_1", xy_to_ad[0][0], "[deg/px] WCS matrix diagonal x->ra")
-        wcshdr.append(key)
-        key=astropy.io.fits.Card( "CD1_2", xy_to_ad[0][1], "[deg/px] WCS matrix outer diagonal y->ra")
-        wcshdr.append(key)
-        key=astropy.io.fits.Card( "CD2_1", xy_to_ad[1][0], "[deg/px] WCS matrix outer diagonal x->delta")
-        wcshdr.append(key)
-        key=astropy.io.fits.Card( "CD2_2", xy_to_ad[1][1], "[deg/px] WCS matrix diagonal y-> delta")
-        wcshdr.append(key)
+        if kmirr is None or k_mocon_steps > 0 :
+            # write only if kmirror status is known...
+            key=astropy.io.fits.Card( "CD1_1", xy_to_ad[0][0], "[deg/px] WCS matrix diagonal x->ra")
+            wcshdr.append(key)
+            key=astropy.io.fits.Card( "CD1_2", xy_to_ad[0][1], "[deg/px] WCS matrix outer diagonal y->ra")
+            wcshdr.append(key)
+            key=astropy.io.fits.Card( "CD2_1", xy_to_ad[1][0], "[deg/px] WCS matrix outer diagonal x->delta")
+            wcshdr.append(key)
+            key=astropy.io.fits.Card( "CD2_2", xy_to_ad[1][1], "[deg/px] WCS matrix diagonal y-> delta")
+            wcshdr.append(key)
 
         # convert the equatorial to horizontal coordinates
         horiz = target.toHoriz(site=site, ambi=ambi, time=now)
@@ -653,15 +662,17 @@ class Siderostat():
 
         # compute the parallactic angle
         pa = target.parallact(site, ambi, now)
-        key=astropy.io.fits.Card("PARANG", pa.deg, "[deg] parallactic angle")
-        wcshdr.append(key)
+        # key=astropy.io.fits.Card("PARANG", pa.deg, "[deg] parallactic angle")
+        # wcshdr.append(key)
 
         # append another WCS 'F' which maps pixels to microns in the focal plane
         self.to_header_wcs_f(wcshdr,is_agw, is_age, genrevx, genrevy,
             pixsize, wd, hd, bin=bin, dist_cam_edge=dist_cam_edge)
 
-        # append another WCS 'A' which maps pixels to the alt-az coordinates
-        self.to_header_wcs_a(wcshdr, numpy.array(xy_to_ad,numpy.double), pa, horiz, crpix1,crpix2)
+        if kmirr is None or k_mocon_steps > 0 :
+            # write only if kmirror status is known...
+            # append another WCS 'A' which maps pixels to the alt-az coordinates
+            self.to_header_wcs_a(wcshdr, numpy.array(xy_to_ad,numpy.double), pa, horiz, crpix1,crpix2)
 
         # update DATE
         fwritetime = datetime.datetime.utcnow()
@@ -954,6 +965,7 @@ class Siderostat():
              both with respect to sign and with respect to mechanical vs
              optical angles.
              If kmirr=None this argument is not used.
+             If the value is less than zero, the k-mirror status is unknown and no WCS is created.
         :type k_mocon_steps: int
 
         :param ag_cam_name: The telescope (skye, skyw, spec, sci) and camera
@@ -1132,9 +1144,8 @@ class Siderostat():
                 # for the sci, skye and skyw we need an angle
                 # but this seems not to be correct here...
                 raise ValueError("unsupported K-mirror angle " + str(kmang) + " on " + tele)
-            else:
-                kmirr = Kmirror()
-                k_mocon_steps=kmirr.radians_to_steps(math.radians(kmang))
+            kmirr = Kmirror()
+            k_mocon_steps=kmirr.radians_to_steps(math.radians(kmang))
         else:
             kmirr = None
             k_mocon_steps=None
@@ -1559,7 +1570,7 @@ class Siderostat():
 
         # In 4 iterations start with a coarse grid and zoom into the
         # region around the best angles found so far to find a global minimum
-        for itr in range(4):
+        for _ in range(4):
             # subdivide the search range of the angles into
             # 30 samples
             off_step = off_range/30.0
@@ -1681,7 +1692,7 @@ class Siderostat():
         # transforms pixels from one WCS to the other.
         aff_ref = Wcsarith(wcs_ref)
         aff_current = Wcsarith(wcs_current)
-        # the affine transwformation that transforms pixels in the current 
+        # the affine transwformation that transforms pixels in the current
         # WCS to pixels in the reference WCS. pixref= W^(-1)ref * W(current)*pixcur
         aff = aff_current / aff_ref
         # print(str(aff)) # debugging
@@ -1693,14 +1704,14 @@ class Siderostat():
 
         # compute where the reference equatorial ra/dec are
         radec = wcs_ref.all_pix2world([0.],[0.],1,ra_dec_order=True)
-        object = astropy.coordinates.SkyCoord(ra=radec[0], dec=radec[1],unit="deg")
-        targ_ref = Target(object)
+        objec = astropy.coordinates.SkyCoord(ra=radec[0], dec=radec[1],unit="deg")
+        targ_ref = Target(objec)
 
         # compute where the current  equatorial ra/dec are
         # Note that this is using wcs_ref again, not wcs_current.
         radec = wcs_ref.all_pix2world([aff.shift[0]],[aff.shift[1]],1,ra_dec_order=True)
-        object = astropy.coordinates.SkyCoord(ra=radec[0], dec=radec[1],unit="deg")
-        targ_current = Target(object)
+        objec = astropy.coordinates.SkyCoord(ra=radec[0], dec=radec[1],unit="deg")
+        targ_current = Target(objec)
 
         if isinstance(time, astropy.time.Time):
             now = time
@@ -1716,14 +1727,13 @@ class Siderostat():
                 refr = ambi
             else:
                 raise TypeError("invalid ambi data type")
-            earthloc = site.toEarthLocation()
         else:
             raise TypeError("invalid site  data type")
 
-        # compute where the reference pixels are in alt/az 
-        aa_ref = targ_ref.toHoriz(site,ambi=ambi,time=now)
+        # compute where the reference pixels are in alt/az
+        aa_ref = targ_ref.toHoriz(site,ambi=refr,time=now)
 
-        # compute where the current pixels are in alt/az 
+        # compute where the current pixels are in alt/az
         aa_current = targ_current.toHoriz(site,ambi=ambi,time=now)
 
         #compute where the reference pixels are in PWI angles
@@ -1736,10 +1746,10 @@ class Siderostat():
         # to be checked: is this the subtraction with the correct sign/order???
         # or do we need to subtract ref from current?
         delta_ax0 = pw_ax_ref[0] - pw_ax_current[0]
-        delta_ax1 = pw_ax_ref[1] - pw_ax_current[1] 
+        delta_ax1 = pw_ax_ref[1] - pw_ax_current[1]
         return delta_ax0, delta_ax1
 
-    def nearby_target(self, t, m2=[0, 0, 0]):
+    def nearby_target(self, t, m2=None):
         '''
         Compute azimuth and zenith angle of a nearby target following
         https://svn.mpia.de/trac/gulli/lvmt/attachment/wiki/software/horCoordLocTarg.pdf
@@ -1779,6 +1789,9 @@ class Siderostat():
                          (math.degrees(zA[0]),math.degrees(zA[1]),zA[2]), end='')
                 print()
         '''
+
+        if m2 is None :
+            m2 = [0,0,0]
 
         # vector T measured from M2 to t with 3 Cartesian coordinates
         m2_to_t=numpy.array([t[0]-m2[0], t[1]-m2[1], t[2]-m2[2]], numpy.double)
@@ -1830,6 +1843,8 @@ class CalibScreen():
     """ A model of the place of the calibration screen under the LVMT roof.
         Default parameters digitized from Fig 2-1 of
         SDSS-V_0111_LVMi_ICD_Telescope_to_Enclosure_Oct21_Rev-revGB.docx
+        To be updated with parameters from
+        https://wiki.sdss.org/display/LVM/2022+Calibration+System+Plan
     """
     def __init__(self, height=2184, slope=0.29157, tabl_off=460):
         """ This is a v-shaped geometry that helps to relate
@@ -1863,7 +1878,7 @@ class CalibScreen():
     def cart_coord(self, x_east_pos):
         """
         The cartesian coordinates of a point that is in the
-        the vertical plane of the M2 mirros and x_east_pos millimeters
+        the vertical plane of the M2 mirrors and x_east_pos millimeters
         to the East of the mid-point between the middle two telescopes.
         :param x_east_pos: the offset relative to the mid-point between
                the middle two telescopes in millimeters.

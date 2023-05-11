@@ -9,8 +9,8 @@ site:
     # geographic longitude in degrees. This uses
     # the international convention where east is positive, whereas
     # in some US-american variants (xephem...) the opposite sign might be seen.
-    geolon: 8.724  # MPIA
-    # geolon: -70.70056 # LCO
+    # geolon: 8.724  # MPIA
+    geolon: -70.70056 # LCO
     # geolon: -105.8202778 # APO -105d49m13s
 
     # geographic latitude in degrees
@@ -18,13 +18,13 @@ site:
     # assembly of the pointing model, see the parameters
     # Latitude and Longitude in Settings/PWI4.cfg somewhere
     # in some relevant container.
-    geolat: 49.3965  # MPIA
-    # geolat: -29.01091  # LCO
+    # geolat: 49.3965  # MPIA
+    geolat: -29.01091  # LCO
     # geolat: 32.78028  # APO 32d46m49s
 
     # geographic altitude in meters above sea level
-    geoalt: 560.0  # MPIA
-    # geoalt: 2280. # LCO
+    #geoalt: 560.0  # MPIA
+    geoalt: 2280. # LCO
     # geoalt: 2788. # APO
 
 sci:
@@ -40,13 +40,13 @@ sci:
         # At LCO both angles are very close to zero if bench and pier
         # are well aligned. The required accuracy is 1/20 deg to
         # meet the requirements on derotator speed accuracies.
-        alt: 0. # MPIA
-        # alt: 0. # LCO
+        # alt: 0. # MPIA
+        alt: 0. # LCO
 
         # az=0 looking north (LCO) and az=180 looking south (MPIA),
         # positive if looking east.
-        az: -180 # MPIA
-        # az: 0. # LCO
+        # az: -180 # MPIA
+        az: 0. # LCO
 
         # offset of the PW motor axis ax1 that rotates M1 in degrees
         # relative to the normalization in the Latex doc
@@ -115,13 +115,13 @@ sci:
 
 skye:
     sid:
-        alt: 0. # MPIA
-        # alt: 0. # LCO
+        # alt: 0. # MPIA
+        alt: 0. # LCO
 
         # az=0 looking north (LCO) and az=180 looking south (MPIA),
         # positive if looking east.
-        az: -180 # MPIA
-        # az: 0. # LCO
+        # az: -180 # MPIA
+        az: 0. # LCO
 
         # offset of the motor axis that rotates M1 in degrees
         # relative to the normalization in the Latex doc
@@ -153,13 +153,13 @@ skye:
 
 skyw:
     sid:
-        alt: 0. # MPIA
-        # alt: 0. # LCO
+        # alt: 0. # MPIA
+        alt: 0. # LCO
 
         # az=0 looking north (LCO) and az=180 looking south (MPIA),
         # positive if looking east.
-        az: -180 # MPIA
-        # az: 0. # LCO
+        # az: -180 # MPIA
+        az: 0. # LCO
 
         # offset of the motor axis that rotates M1 in degrees
         # relative to the normalization in the Latex doc
@@ -191,13 +191,13 @@ skyw:
 
 spec:
     sid:
-        alt: 0. # MPIA
-        # alt: 0. # LCO
+        # alt: 0. # MPIA
+        alt: 0. # LCO
 
         # az=0 looking north (LCO) and az=180 looking south (MPIA),
         # positive if looking east.
-        az: -180 # MPIA
-        # az: 0. # LCO
+        # az: -180 # MPIA
+        az: 0. # LCO
 
         # offset of the motor axis that rotates M1 in degrees
         # relative to the normalization in the Latex doc

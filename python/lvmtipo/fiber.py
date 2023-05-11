@@ -89,7 +89,7 @@ class Fiber():
             raise NameError("invalid fiber name " + self.name)
         idx %= pixperrow
 
-        # even row = index up = outwarrds, odd row = index up = inwards
+        # even row = index up = outwards, odd row = index up = inwards
         # undo the meander by countin all columns inwards out, also for odd rows
         if (row % 2) != 0 :
             idx = pixperrow - idx - 1
@@ -114,7 +114,7 @@ class Fiber():
             y = -0.5* idx + row
 
         # So far the x and y coordinates are in units where
-        # the distance between hexagon neigbours is (center to center) is 1.
+        # the distance between hexagon neigbours (center to center) is 1.
         # Multiply by pitch to get actual physical dimensions in the focal plane
         return x*self.pitch, y*self.pitch
 
